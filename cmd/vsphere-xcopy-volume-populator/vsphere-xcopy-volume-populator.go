@@ -4,6 +4,7 @@ import (
 	"context"
 	"flag"
 	"fmt"
+	"github.com/kubev2v/forklift/cmd/vsphere-xcopy-volume-populator/internal/par3"
 	"net/http"
 	"os"
 	"path"
@@ -69,6 +70,12 @@ func main() {
 		sm, err := ontap.NewNetappClonner(storageHostname, storageUsername, storagePassword)
 		if err != nil {
 			klog.Fatalf("failed to initialize ontap storage mapper with %s", err)
+		}
+		storageApi = &sm
+	case "par3":
+		sm, err := par3.NewPar3Clonner(storageHostname, storageUsername, storagePassword)
+		if err != nil {
+			klog.Fatalf("failed to initialize par3 clonner with %s", err)
 		}
 		storageApi = &sm
 	default:

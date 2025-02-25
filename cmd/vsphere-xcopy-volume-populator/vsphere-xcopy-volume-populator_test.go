@@ -42,6 +42,10 @@ func TestPopulator(t *testing.T) {
 			sourceVMDK: "[my-ds] my-vm/vmdisk.vmdk",
 			targetPVC:  "pvc-12345",
 			setup: func() {
+				vmwareClient.EXPECT().GetEsxByVm(context.Background(), gomock.Any())
+				vmwareClient.EXPECT().RunEsxCommand(context.Background(), gomock.Any(),
+					[]string{"iscsi", "adapter", "list"})
+				storageClient.EXPECT().EnsureClonnerIgroup(gomock.Any(), gomock.Any())
 				storageClient.EXPECT().ResolveVolumeHandleToLUN("pvc-12345").Return(populator.LUN{}, fmt.Errorf("")).Times(1)
 			},
 			want: fmt.Errorf(""),
@@ -51,8 +55,12 @@ func TestPopulator(t *testing.T) {
 			sourceVMDK: "[my-ds] my-vm/vmdisk.vmdk",
 			targetPVC:  "pvc-12345",
 			setup: func() {
-				storageClient.EXPECT().ResolveVolumeHandleToLUN("pvc-12345").Return(populator.LUN{SerialNumber: "abc"}, nil)
-				storageClient.EXPECT().CurrentMappedGroups(populator.LUN{SerialNumber: "abc"}).Return(nil, fmt.Errorf(""))
+				vmwareClient.EXPECT().GetEsxByVm(context.Background(), gomock.Any())
+				vmwareClient.EXPECT().RunEsxCommand(context.Background(), gomock.Any(),
+					[]string{"iscsi", "adapter", "list"})
+				storageClient.EXPECT().EnsureClonnerIgroup(gomock.Any(), gomock.Any())
+				storageClient.EXPECT().ResolveVolumeHandleToLUN("pvc-12345").Return(populator.LUN{NAA: "naa.616263"}, nil)
+				storageClient.EXPECT().CurrentMappedGroups(populator.LUN{NAA: "naa.616263"}).Return(nil, fmt.Errorf(""))
 			},
 			want: fmt.Errorf("failed to fetch the current initiator groups of the lun : %w", fmt.Errorf("")),
 		},
@@ -61,8 +69,12 @@ func TestPopulator(t *testing.T) {
 			sourceVMDK: "[my-ds] my-vm/vmdisk.vmdk",
 			targetPVC:  "pvc-12345",
 			setup: func() {
-				storageClient.EXPECT().ResolveVolumeHandleToLUN("pvc-12345").Return(populator.LUN{SerialNumber: "abc"}, nil)
-				storageClient.EXPECT().CurrentMappedGroups(populator.LUN{SerialNumber: "abc"}).Return(nil, fmt.Errorf(""))
+				vmwareClient.EXPECT().GetEsxByVm(context.Background(), gomock.Any())
+				vmwareClient.EXPECT().RunEsxCommand(context.Background(), gomock.Any(),
+					[]string{"iscsi", "adapter", "list"})
+				storageClient.EXPECT().EnsureClonnerIgroup(gomock.Any(), gomock.Any())
+				storageClient.EXPECT().ResolveVolumeHandleToLUN("pvc-12345").Return(populator.LUN{NAA: "naa.616263"}, nil)
+				storageClient.EXPECT().CurrentMappedGroups(populator.LUN{NAA: "naa.616263"}).Return(nil, fmt.Errorf(""))
 			},
 			want: fmt.Errorf("failed to fetch the current initiator groups of the lun : %w", fmt.Errorf("")),
 		},
@@ -72,9 +84,9 @@ func TestPopulator(t *testing.T) {
 			sourceVMDK: "[my-ds] my-vm/vmdisk.vmdk",
 			targetPVC:  "pvc-12345",
 			setup: func() {
-				storageClient.EXPECT().ResolveVolumeHandleToLUN("pvc-12345").Return(populator.LUN{SerialNumber: "abc"}, nil).Times(1)
-				storageClient.EXPECT().CurrentMappedGroups(populator.LUN{SerialNumber: "abc"})
 				vmwareClient.EXPECT().GetEsxByVm(gomock.Any(), "my-vm").Return(nil, fmt.Errorf("")).Times(1)
+				storageClient.EXPECT().ResolveVolumeHandleToLUN("pvc-12345").Return(populator.LUN{NAA: "naa.616263"}, nil).Times(1)
+				storageClient.EXPECT().CurrentMappedGroups(populator.LUN{NAA: "naa.616263"})
 			},
 			want: fmt.Errorf(""),
 		},
@@ -82,18 +94,18 @@ func TestPopulator(t *testing.T) {
 		{
 			name: "working source and target",
 			setup: func() {
-				storageClient.EXPECT().ResolveVolumeHandleToLUN("pvc-12345").Return(populator.LUN{SerialNumber: "abc"}, nil)
-				storageClient.EXPECT().CurrentMappedGroups(gomock.Any())
-				storageClient.EXPECT().EnsureClonnerIgroup(gomock.Any(), gomock.Any())
-				storageClient.EXPECT().Map("xcopy-esxs", gomock.Any())
-				storageClient.EXPECT().UnMap(gomock.Any(), gomock.Any())
 				vmwareClient.EXPECT().GetEsxByVm(context.Background(), gomock.Any())
 				vmwareClient.EXPECT().RunEsxCommand(context.Background(), gomock.Any(),
 					[]string{"iscsi", "adapter", "list"})
+				storageClient.EXPECT().EnsureClonnerIgroup(gomock.Any(), gomock.Any())
+				storageClient.EXPECT().Map("xcopy-esxs", gomock.Any())
+				storageClient.EXPECT().UnMap(gomock.Any(), gomock.Any())
 				vmwareClient.EXPECT().RunEsxCommand(context.Background(), gomock.Any(),
 					[]string{"storage", "core", "adapter", "rescan", "-a", "1"})
 				vmwareClient.EXPECT().RunEsxCommand(context.Background(), gomock.Any(),
-					[]string{"vmkfstools", "clone", "-s", "[my-ds] my-vm/vmdisk.vmdk", "-t", "/vmfs/devices/disks/naa.616263"})
+					[]string{"storage", "core", "device", "list", "-d", "naa.616263"})
+				vmwareClient.EXPECT().RunEsxCommand(context.Background(), gomock.Any(),
+					[]string{"vmkfstools", "clone", "-s", "/vmfs/volumes/my-ds/my-vm/vmdisk.vmdk", "-t", "/vmfs/devices/disks/naa.616263"})
 			},
 			sourceVMDK: "[my-ds] my-vm/vmdisk.vmdk",
 			targetPVC:  "pvc-12345",

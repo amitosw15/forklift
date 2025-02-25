@@ -70,7 +70,7 @@ func (mr *MockStorageApiMockRecorder) EnsureClonnerIgroup(initiatorGroup, clonne
 }
 
 // Map mocks base method.
-func (m *MockStorageApi) Map(initatorGroup string, targetLUN populator.LUN) error {
+func (m *MockStorageApi) Map(initatorGroup string, targetLUN *populator.LUN) error {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "Map", initatorGroup, targetLUN)
 	ret0, _ := ret[0].(error)
