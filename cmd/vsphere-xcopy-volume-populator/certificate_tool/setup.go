@@ -9,17 +9,11 @@ import (
 	"strings"
 )
 
-type goHelper interface {
-	RunCommand(cmd string, args ...string) (string, error)
-}
-
-type goHelperImpl struct{}
-
 var sudoPassword string
 var valuesPath = "tests/e2e/primera-values.yaml"
 
 // RunCommand runs a shell command and tries without sudo first, then retries with sudo if needed.
-func (*goHelperImpl) RunCommand(cmdStr string) (string, error) {
+func RunCommand(cmdStr string) (string, error) {
 	fmt.Println("Executing:", cmdStr)
 	cmd := exec.Command("bash", "-c", cmdStr)
 	output, err := cmd.CombinedOutput()
@@ -45,10 +39,9 @@ func AskForSudoPassword() {
 func main() {
 	// Ask for sudo password at the beginning
 	AskForSudoPassword()
-	goHelperImpl := goHelperImpl{}
 	defer func() {
 		fmt.Println("🔄 Cleaning up: Deleting Kind cluster...")
-		goHelperImpl.RunCommand("kind delete cluster --name copy-offload-test")
+		RunCommand("kind delete cluster --name copy-offload-test")
 		fmt.Println("✅ Kind cluster deleted!")
 	}()
 
