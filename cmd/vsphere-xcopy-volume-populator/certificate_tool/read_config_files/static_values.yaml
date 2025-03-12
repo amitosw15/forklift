@@ -1,0 +1,4 @@
+target-namespace: default
+storage-vendor: ontap
+secret-name: populator-secret
+kubeconfig: "/somepath"
