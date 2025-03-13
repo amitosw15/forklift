@@ -7,8 +7,8 @@ import (
 )
 
 const (
-	configFile = "read_config_files/static_values.yaml"
-	envFile    = "read_config_files/dynamic_values.yaml"
+	configFile = "read-config-files/static_values.yaml"
+	envFile    = "read-config-files/dynamic_values.yaml"
 )
 
 func runMake(target string, envVars ...string) (string, error) {

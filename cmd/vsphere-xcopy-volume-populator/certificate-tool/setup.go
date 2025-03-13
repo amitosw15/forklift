@@ -36,7 +36,7 @@ func AskForSudoPassword() {
 	sudoPassword = strings.TrimSpace(password)
 }
 
-func main() {
+func setupEnvironment() {
 	// Ask for sudo password at the beginning
 	AskForSudoPassword()
 	defer func() {
