@@ -16,7 +16,7 @@ import (
 	"k8s.io/klog/v2"
 )
 
-// go:generate mockgen -destination=mocks/vmware_mock_client.go -package=vmware_mocks . Client
+//go:generate mockgen -destination=mocks/vmware_mock_client.go -package=vmware_mocks . Client
 type Client interface {
 	GetEsxByVm(ctx context.Context, vmName string) (*object.HostSystem, error)
 	RunEsxCommand(ctx context.Context, host *object.HostSystem, command []string) ([]esx.Values, error)

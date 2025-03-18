@@ -1,4 +1,4 @@
-package par3
+package primera3par
 
 import (
 	"bytes"
@@ -16,14 +16,14 @@ import (
 	"time"
 )
 
-type Par3Client interface {
+type Primera3ParClient interface {
 	GetSessionKey() (string, error)
-	EnsureLunMapped(initiatorGroup string, targetLUN *populator.LUN) error
+	EnsureLunMapped(initiatorGroup string, targetLUN populator.LUN) (populator.LUN, error)
 	LunUnmap(ctx context.Context, initiatorGroupName, lunName string) error
 	EnsureHostWithIqn(iqn string) (string, error)
 	EnsureHostSetExists(hostSetName string) error
 	AddHostToHostSet(hostSetName string, hostName string) error
-	GetLunDetailsByVolumeName(lunName string, lun *populator.LUN) error
+	GetLunDetailsByVolumeName(lunName string, lun populator.LUN) (populator.LUN, error)
 	CurrentMappedGroups(volumeName string) ([]string, error)
 }
 
@@ -60,7 +60,7 @@ type Link struct {
 	Rel  string `json:"rel"`
 }
 
-type Par3ClientWsImpl struct {
+type Primera3ParClientWsImpl struct {
 	BaseURL          string
 	SessionKey       string
 	Password         string
@@ -69,8 +69,8 @@ type Par3ClientWsImpl struct {
 	SessionStartTime time.Time
 }
 
-func NewPar3ClientWsImpl(storageHostname, storageUsername, storagePassword string) Par3ClientWsImpl {
-	return Par3ClientWsImpl{
+func NewPrimera3ParClientWsImpl(storageHostname, storageUsername, storagePassword string) Primera3ParClientWsImpl {
+	return Primera3ParClientWsImpl{
 		BaseURL:  storageHostname,
 		Password: storagePassword,
 		Username: storageUsername,
@@ -82,7 +82,7 @@ func NewPar3ClientWsImpl(storageHostname, storageUsername, storagePassword strin
 	}
 }
 
-func (p *Par3ClientWsImpl) EnsureHostWithIqn(iqn string) (string, error) {
+func (p *Primera3ParClientWsImpl) EnsureHostWithIqn(iqn string) (string, error) {
 	hostName, err := p.getHostByIQN(iqn)
 	if err != nil {
 		return "", fmt.Errorf("failed to get host by iqn: %w", err)
@@ -100,7 +100,7 @@ func (p *Par3ClientWsImpl) EnsureHostWithIqn(iqn string) (string, error) {
 	return hostName, err
 }
 
-func (p *Par3ClientWsImpl) getHostByIQN(iqn string) (string, error) {
+func (p *Primera3ParClientWsImpl) getHostByIQN(iqn string) (string, error) {
 	url := fmt.Sprintf("%s/api/v1/hosts", p.BaseURL)
 
 	req, err := http.NewRequest("GET", url, nil)
@@ -113,7 +113,6 @@ func (p *Par3ClientWsImpl) getHostByIQN(iqn string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-
 	for _, host := range hostData.Members {
 		for _, existingIQN := range host.ISCSIPaths {
 			if existingIQN.Name == iqn {
@@ -125,7 +124,7 @@ func (p *Par3ClientWsImpl) getHostByIQN(iqn string) (string, error) {
 	return "", nil
 }
 
-func (p *Par3ClientWsImpl) hostExists(hostname string) (bool, error) {
+func (p *Primera3ParClientWsImpl) hostExists(hostname string) (bool, error) {
 	url := fmt.Sprintf("%s/api/v1/hosts/%s", p.BaseURL, hostname)
 
 	req, err := http.NewRequest("GET", url, nil)
@@ -151,7 +150,7 @@ func (p *Par3ClientWsImpl) hostExists(hostname string) (bool, error) {
 	return false, fmt.Errorf("unexpected response: %d, body: %s", resp.StatusCode, string(body))
 }
 
-func (p *Par3ClientWsImpl) createHost(hostname, iqn string) error {
+func (p *Primera3ParClientWsImpl) createHost(hostname, iqn string) error {
 	url := fmt.Sprintf("%s/api/v1/hosts", p.BaseURL)
 
 	requestBody := map[string]interface{}{
@@ -184,7 +183,7 @@ func (p *Par3ClientWsImpl) createHost(hostname, iqn string) error {
 	return fmt.Errorf("failed to create host: status %d, body: %s", resp.StatusCode, string(body))
 }
 
-func (p *Par3ClientWsImpl) GetSessionKey() (string, error) {
+func (p *Primera3ParClientWsImpl) GetSessionKey() (string, error) {
 	if time.Since(p.SessionStartTime) < 3*time.Minute && p.SessionKey != "" {
 		klog.Info("Reusing existing session key, still valid.")
 		return p.SessionKey, nil
@@ -245,56 +244,56 @@ func (p *Par3ClientWsImpl) GetSessionKey() (string, error) {
 	return "", fmt.Errorf("failed to retrieve session key, response: %s", string(bodyBytes))
 }
 
-func (p *Par3ClientWsImpl) EnsureLunMapped(initiatorGroup string, targetLUN *populator.LUN) error {
+func (p *Primera3ParClientWsImpl) EnsureLunMapped(initiatorGroup string, targetLUN populator.LUN) (populator.LUN, error) {
 	targetLUN.IQN = initiatorGroup
 	hostSetName := fmt.Sprintf("set:%s", initiatorGroup)
 	vlun, err := p.GetVLun(targetLUN.Name, hostSetName)
 	if err != nil {
-		return err
+		return populator.LUN{}, err
 	}
 
 	if vlun != nil {
-		return nil
+		return targetLUN, nil
 	}
-
-	url := fmt.Sprintf("%s/api/v1/vluns", p.BaseURL)
 
 	lunID, err := p.GetFreeLunID(initiatorGroup)
 	if err != nil {
-		return err
+		return populator.LUN{}, err
 	}
 
+	// note autoLun is on, and lun is set as well - this combination works for both primera and 3par.
+	// "autoLun" alone fails for 3par despite documentation, and setting lun fails for primera.
 	requestBody := map[string]interface{}{
 		"volumeName": targetLUN.Name,
 		"lun":        lunID,
 		"hostname":   hostSetName,
-		"autoLun":    false,
+		"autoLun":    true,
 	}
 
 	jsonBody, err := json.Marshal(requestBody)
 	if err != nil {
-		return fmt.Errorf("failed to encode JSON: %w", err)
+		return populator.LUN{}, fmt.Errorf("failed to encode JSON: %w", err)
 	}
 
+	url := fmt.Sprintf("%s/api/v1/vluns", p.BaseURL)
 	req, err := http.NewRequest("POST", url, bytes.NewBuffer(jsonBody))
 	if err != nil {
-		return fmt.Errorf("failed to create request: %w", err)
+		return populator.LUN{}, fmt.Errorf("failed to create request: %w", err)
 	}
 
 	resp, err := p.doRequest(req, "ensureLunMapping")
 	if err != nil {
-		return fmt.Errorf("request failed: %w", err)
+		return populator.LUN{}, fmt.Errorf("request failed: %w", err)
 	}
 	defer resp.Body.Close()
-
 	if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusCreated {
-		return fmt.Errorf("failed to map LUN: status %d, resp: %v", resp.StatusCode, resp)
+		return populator.LUN{}, fmt.Errorf("failed to map LUN: status %d, resp: %v", resp.StatusCode, resp)
 	}
 
-	return nil
+	return targetLUN, nil
 }
 
-func (p *Par3ClientWsImpl) LunUnmap(ctx context.Context, initiatorGroupName, lunName string) error {
+func (p *Primera3ParClientWsImpl) LunUnmap(ctx context.Context, initiatorGroupName, lunName string) error {
 	lunID, err := p.GetVLunID(lunName, fmt.Sprintf("set:%s", initiatorGroupName))
 	if err != nil {
 		return fmt.Errorf("failed to get LUN ID: %w", err)
@@ -336,7 +335,7 @@ func (p *Par3ClientWsImpl) LunUnmap(ctx context.Context, initiatorGroupName, lun
 	return nil
 }
 
-func (p *Par3ClientWsImpl) GetFreeLunID(initiatorGroupName string) (int, error) {
+func (p *Primera3ParClientWsImpl) GetFreeLunID(initiatorGroupName string) (int, error) {
 	url := fmt.Sprintf("%s/api/v1/vluns", p.BaseURL)
 
 	req, err := http.NewRequest("GET", url, nil)
@@ -371,7 +370,7 @@ func (p *Par3ClientWsImpl) GetFreeLunID(initiatorGroupName string) (int, error) 
 	return 0, fmt.Errorf("no available LUN ID found for host %s", initiatorGroupName)
 }
 
-func (p *Par3ClientWsImpl) GetVLunSerial(volumeName, hostName string) (string, error) {
+func (p *Primera3ParClientWsImpl) GetVLunSerial(volumeName, hostName string) (string, error) {
 	lun, err := p.GetVLun(volumeName, hostName)
 	if err != nil {
 		return "", err
@@ -389,7 +388,7 @@ type VLun struct {
 	Serial     string `json:"serial"`
 }
 
-func (p *Par3ClientWsImpl) GetVLun(volumeName, hostname string) (*VLun, error) {
+func (p *Primera3ParClientWsImpl) GetVLun(volumeName, hostname string) (*VLun, error) {
 	url := fmt.Sprintf("%s/api/v1/vluns", p.BaseURL)
 
 	req, err := http.NewRequest("GET", url, nil)
@@ -413,7 +412,7 @@ func (p *Par3ClientWsImpl) GetVLun(volumeName, hostname string) (*VLun, error) {
 	return nil, nil
 }
 
-func (p *Par3ClientWsImpl) GetVLunID(lunName, initiatorGroupName string) (int, error) {
+func (p *Primera3ParClientWsImpl) GetVLunID(lunName, initiatorGroupName string) (int, error) {
 	lun, err := p.GetVLun(lunName, initiatorGroupName)
 	if err != nil {
 		return 0, err
@@ -424,14 +423,14 @@ func (p *Par3ClientWsImpl) GetVLunID(lunName, initiatorGroupName string) (int, e
 	return lun.LUN, nil
 }
 
-func (p *Par3ClientWsImpl) GetLunDetailsByVolumeName(volumeName string, lun *populator.LUN) error {
+func (p *Primera3ParClientWsImpl) GetLunDetailsByVolumeName(volumeName string, lun populator.LUN) (populator.LUN, error) {
 	cutVolName := prefixOfString(volumeName, 31)
 	url := fmt.Sprintf("%s/api/v1/volumes/%s", p.BaseURL, cutVolName)
 
 	reqType := "getVolume"
 	req, err := http.NewRequest("GET", url, nil)
 	if err != nil {
-		return fmt.Errorf("failed to create request: %w", err)
+		return populator.LUN{}, fmt.Errorf("failed to create request: %w", err)
 	}
 	type MyResponse struct {
 		Id   int    `json:"id"`
@@ -443,18 +442,18 @@ func (p *Par3ClientWsImpl) GetLunDetailsByVolumeName(volumeName string, lun *pop
 
 	err = p.doRequestUnmarshalResponse(req, reqType, &response)
 	if err != nil {
-		return err
+		return populator.LUN{}, err
 	}
 
 	if response.Name != "" {
 		lun.Name = cutVolName
-		lun.NAA = fmt.Sprintf("naa.%s", strings.ToLower(response.WWN))
-		return nil
+		lun.NAA = strings.ToLower(response.WWN)
+		return lun, nil
 	}
-	return fmt.Errorf("volume not found for volume: %s", cutVolName)
+	return populator.LUN{}, fmt.Errorf("volume not found for volume: %s", cutVolName)
 }
 
-func (p *Par3ClientWsImpl) CurrentMappedGroups(volumeName string) ([]string, error) {
+func (p *Primera3ParClientWsImpl) CurrentMappedGroups(volumeName string) ([]string, error) {
 	type VLUN struct {
 		LUN        int    `json:"lun"`
 		VolumeName string `json:"volumeName"`
@@ -493,7 +492,7 @@ func (p *Par3ClientWsImpl) CurrentMappedGroups(volumeName string) ([]string, err
 	return hostnames, nil
 }
 
-func (p *Par3ClientWsImpl) doRequest(req *http.Request, reqDescription string) (*http.Response, error) {
+func (p *Primera3ParClientWsImpl) doRequest(req *http.Request, reqDescription string) (*http.Response, error) {
 	_, err := p.GetSessionKey()
 	if err != nil {
 		return nil, err
@@ -513,7 +512,7 @@ func (p *Par3ClientWsImpl) doRequest(req *http.Request, reqDescription string) (
 	return resp, nil
 }
 
-func (p *Par3ClientWsImpl) doRequestUnmarshalResponse(req *http.Request, reqDescription string, response interface{}) error {
+func (p *Primera3ParClientWsImpl) doRequestUnmarshalResponse(req *http.Request, reqDescription string, response interface{}) error {
 	_, err := p.GetSessionKey()
 	if err != nil {
 		return err
@@ -535,7 +534,6 @@ func (p *Par3ClientWsImpl) doRequestUnmarshalResponse(req *http.Request, reqDesc
 		body, _ := io.ReadAll(resp.Body)
 		return fmt.Errorf("failed for %s: status %d, body: %s", reqDescription, resp.StatusCode, string(body))
 	}
-
 	bodyBytes, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return fmt.Errorf("failed to read response for %s: %w", reqDescription, err)
@@ -548,7 +546,7 @@ func (p *Par3ClientWsImpl) doRequestUnmarshalResponse(req *http.Request, reqDesc
 	return nil
 }
 
-func (p *Par3ClientWsImpl) handleUnauthorizedSessionKey(resp *http.Response, req *http.Request, err error) (*http.Response, error) {
+func (p *Primera3ParClientWsImpl) handleUnauthorizedSessionKey(resp *http.Response, req *http.Request, err error) (*http.Response, error) {
 	if resp.StatusCode == http.StatusUnauthorized {
 		if _, err := p.GetSessionKey(); err != nil {
 			return nil, fmt.Errorf("failed to refresh session key: %w", err)
@@ -564,7 +562,7 @@ func (p *Par3ClientWsImpl) handleUnauthorizedSessionKey(resp *http.Response, req
 	return resp, nil
 }
 
-func (p *Par3ClientWsImpl) EnsureHostSetExists(hostSetName string) error {
+func (p *Primera3ParClientWsImpl) EnsureHostSetExists(hostSetName string) error {
 	url := fmt.Sprintf("%s/api/v1/hostsets/%s", p.BaseURL, hostSetName)
 
 	req, err := http.NewRequest("GET", url, nil)
@@ -609,12 +607,12 @@ func (p *Par3ClientWsImpl) EnsureHostSetExists(hostSetName string) error {
 	return nil
 }
 
-func (p *Par3ClientWsImpl) setReqHeadersWithSessionKey(req *http.Request) {
+func (p *Primera3ParClientWsImpl) setReqHeadersWithSessionKey(req *http.Request) {
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("X-HP3PAR-WSAPI-SessionKey", p.SessionKey)
 }
 
-func (p *Par3ClientWsImpl) AddHostToHostSet(hostSetName string, hostName string) error {
+func (p *Primera3ParClientWsImpl) AddHostToHostSet(hostSetName string, hostName string) error {
 	url := fmt.Sprintf("%s/api/v1/hostsets/%s", p.BaseURL, hostSetName)
 
 	requestBody := map[string]interface{}{

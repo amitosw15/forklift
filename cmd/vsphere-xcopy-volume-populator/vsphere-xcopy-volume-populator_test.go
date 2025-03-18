@@ -59,8 +59,8 @@ func TestPopulator(t *testing.T) {
 				vmwareClient.EXPECT().RunEsxCommand(context.Background(), gomock.Any(),
 					[]string{"iscsi", "adapter", "list"})
 				storageClient.EXPECT().EnsureClonnerIgroup(gomock.Any(), gomock.Any())
-				storageClient.EXPECT().ResolveVolumeHandleToLUN("pvc-12345").Return(populator.LUN{NAA: "naa.616263"}, nil)
-				storageClient.EXPECT().CurrentMappedGroups(populator.LUN{NAA: "naa.616263"}).Return(nil, fmt.Errorf(""))
+				storageClient.EXPECT().ResolveVolumeHandleToLUN("pvc-12345").Return(populator.LUN{NAA: "616263"}, nil)
+				storageClient.EXPECT().CurrentMappedGroups(populator.LUN{NAA: "616263"}).Return(nil, fmt.Errorf(""))
 			},
 			want: fmt.Errorf("failed to fetch the current initiator groups of the lun : %w", fmt.Errorf("")),
 		},
@@ -73,8 +73,8 @@ func TestPopulator(t *testing.T) {
 				vmwareClient.EXPECT().RunEsxCommand(context.Background(), gomock.Any(),
 					[]string{"iscsi", "adapter", "list"})
 				storageClient.EXPECT().EnsureClonnerIgroup(gomock.Any(), gomock.Any())
-				storageClient.EXPECT().ResolveVolumeHandleToLUN("pvc-12345").Return(populator.LUN{NAA: "naa.616263"}, nil)
-				storageClient.EXPECT().CurrentMappedGroups(populator.LUN{NAA: "naa.616263"}).Return(nil, fmt.Errorf(""))
+				storageClient.EXPECT().ResolveVolumeHandleToLUN("pvc-12345").Return(populator.LUN{NAA: "616263"}, nil)
+				storageClient.EXPECT().CurrentMappedGroups(populator.LUN{NAA: "616263"}).Return(nil, fmt.Errorf(""))
 			},
 			want: fmt.Errorf("failed to fetch the current initiator groups of the lun : %w", fmt.Errorf("")),
 		},
@@ -85,8 +85,8 @@ func TestPopulator(t *testing.T) {
 			targetPVC:  "pvc-12345",
 			setup: func() {
 				vmwareClient.EXPECT().GetEsxByVm(gomock.Any(), "my-vm").Return(nil, fmt.Errorf("")).Times(1)
-				storageClient.EXPECT().ResolveVolumeHandleToLUN("pvc-12345").Return(populator.LUN{NAA: "naa.616263"}, nil).Times(1)
-				storageClient.EXPECT().CurrentMappedGroups(populator.LUN{NAA: "naa.616263"})
+				storageClient.EXPECT().ResolveVolumeHandleToLUN("pvc-12345").Return(populator.LUN{NAA: "616263"}, nil).Times(1)
+				storageClient.EXPECT().CurrentMappedGroups(populator.LUN{NAA: "616263"})
 			},
 			want: fmt.Errorf(""),
 		},
@@ -98,7 +98,7 @@ func TestPopulator(t *testing.T) {
 				vmwareClient.EXPECT().RunEsxCommand(context.Background(), gomock.Any(),
 					[]string{"iscsi", "adapter", "list"})
 				storageClient.EXPECT().EnsureClonnerIgroup(gomock.Any(), gomock.Any())
-				storageClient.EXPECT().Map("xcopy-esxs", gomock.Any())
+				storageClient.EXPECT().Map("xcopy-esxs", gomock.Any()).Return(populator.LUN{NAA: "616263"}, nil)
 				storageClient.EXPECT().UnMap(gomock.Any(), gomock.Any())
 				vmwareClient.EXPECT().RunEsxCommand(context.Background(), gomock.Any(),
 					[]string{"storage", "core", "adapter", "rescan", "-a", "1"})

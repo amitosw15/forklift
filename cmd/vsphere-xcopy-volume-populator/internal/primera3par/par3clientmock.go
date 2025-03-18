@@ -1,4 +1,4 @@
-package par3
+package primera3par
 
 import (
 	"context"
@@ -8,7 +8,7 @@ import (
 	"github.com/kubev2v/forklift/cmd/vsphere-xcopy-volume-populator/internal/populator"
 )
 
-type MockPar3Client struct {
+type MockPrimera3ParClient struct {
 	SessionKey string
 	Volumes    map[string]populator.LUN
 	VLUNs      map[string][]VLun
@@ -16,8 +16,8 @@ type MockPar3Client struct {
 	HostSets   map[string][]string
 }
 
-func NewMockPar3Client() *MockPar3Client {
-	return &MockPar3Client{
+func NewMockPrimera3ParClient() *MockPrimera3ParClient {
+	return &MockPrimera3ParClient{
 		SessionKey: "mock-session-key",
 		Volumes:    make(map[string]populator.LUN),
 		VLUNs:      make(map[string][]VLun),
@@ -26,12 +26,12 @@ func NewMockPar3Client() *MockPar3Client {
 	}
 }
 
-func (m *MockPar3Client) GetSessionKey() (string, error) {
+func (m *MockPrimera3ParClient) GetSessionKey() (string, error) {
 	log.Println("Mock: GetSessionKey called")
 	return m.SessionKey, nil
 }
 
-func (m *MockPar3Client) EnsureHostWithIqn(iqn string) (string, error) {
+func (m *MockPrimera3ParClient) EnsureHostWithIqn(iqn string) (string, error) {
 	for hostName, existingIQN := range m.Hosts {
 		if existingIQN == iqn {
 			return hostName, nil
@@ -44,7 +44,7 @@ func (m *MockPar3Client) EnsureHostWithIqn(iqn string) (string, error) {
 	return hostName, nil
 }
 
-func (m *MockPar3Client) EnsureHostSetExists(hostSetName string) error {
+func (m *MockPrimera3ParClient) EnsureHostSetExists(hostSetName string) error {
 	if _, exists := m.HostSets[hostSetName]; !exists {
 		m.HostSets[hostSetName] = []string{}
 		log.Printf("Mock: Created host set %s", hostSetName)
@@ -52,7 +52,7 @@ func (m *MockPar3Client) EnsureHostSetExists(hostSetName string) error {
 	return nil
 }
 
-func (m *MockPar3Client) AddHostToHostSet(hostSetName string, hostName string) error {
+func (m *MockPrimera3ParClient) AddHostToHostSet(hostSetName string, hostName string) error {
 	if _, exists := m.HostSets[hostSetName]; !exists {
 		return fmt.Errorf("mock: host set %s does not exist", hostSetName)
 	}
@@ -68,9 +68,9 @@ func (m *MockPar3Client) AddHostToHostSet(hostSetName string, hostName string) e
 	return nil
 }
 
-func (m *MockPar3Client) EnsureLunMapped(initiatorGroup string, targetLUN *populator.LUN) error {
+func (m *MockPrimera3ParClient) EnsureLunMapped(initiatorGroup string, targetLUN populator.LUN) (populator.LUN, error) {
 	if _, exists := m.Volumes[targetLUN.Name]; !exists {
-		return fmt.Errorf("mock: volume %s does not exist", targetLUN.Name)
+		return populator.LUN{}, fmt.Errorf("mock: volume %s does not exist", targetLUN.Name)
 	}
 
 	vlun := VLun{
@@ -81,10 +81,10 @@ func (m *MockPar3Client) EnsureLunMapped(initiatorGroup string, targetLUN *popul
 
 	m.VLUNs[initiatorGroup] = append(m.VLUNs[initiatorGroup], vlun)
 	log.Printf("Mock: EnsureLunMapped -> Volume %s mapped to initiator group %s with LUN ID %d", targetLUN.Name, initiatorGroup, vlun.LUN)
-	return nil
+	return targetLUN, nil
 }
 
-func (m *MockPar3Client) LunUnmap(ctx context.Context, initiatorGroupName, lunName string) error {
+func (m *MockPrimera3ParClient) LunUnmap(ctx context.Context, initiatorGroupName, lunName string) error {
 	vluns, exists := m.VLUNs[initiatorGroupName]
 	if !exists {
 		return fmt.Errorf("mock: no VLUNs found for initiator group %s", initiatorGroupName)
@@ -101,18 +101,16 @@ func (m *MockPar3Client) LunUnmap(ctx context.Context, initiatorGroupName, lunNa
 	return fmt.Errorf("mock: LUN %s not found for initiator group %s", lunName, initiatorGroupName)
 }
 
-func (m *MockPar3Client) GetLunDetailsByVolumeName(lunName string, lun *populator.LUN) error {
+func (m *MockPrimera3ParClient) GetLunDetailsByVolumeName(lunName string, lun populator.LUN) (populator.LUN, error) {
 	if volume, exists := m.Volumes[lunName]; exists {
-		*lun = volume
-
 		log.Printf("Mock: GetLunDetailsByVolumeName -> Found volume %s", lunName)
-		return nil
+		return volume, nil
 	}
 
-	return fmt.Errorf("mock: volume %s not found", lunName)
+	return populator.LUN{}, fmt.Errorf("mock: volume %s not found", lunName)
 }
 
-func (m *MockPar3Client) CurrentMappedGroups(volumeName string) ([]string, error) {
+func (m *MockPrimera3ParClient) CurrentMappedGroups(volumeName string) ([]string, error) {
 	var groups []string
 
 	for group, vluns := range m.VLUNs {

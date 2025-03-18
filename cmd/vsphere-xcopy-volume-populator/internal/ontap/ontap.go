@@ -18,12 +18,12 @@ type NetappClonner struct {
 }
 
 // Map the targetLUN to the initiator group.
-func (c *NetappClonner) Map(initatorGroup string, targetLUN *populator.LUN) error {
+func (c *NetappClonner) Map(initatorGroup string, targetLUN populator.LUN) (populator.LUN, error) {
 	_, err := c.api.EnsureLunMapped(context.TODO(), initatorGroup, targetLUN.Name)
 	if err != nil {
-		return fmt.Errorf("Failed to map lun path %s to group %s: %w ", targetLUN.Name, initatorGroup, err)
+		return populator.LUN{}, fmt.Errorf("Failed to map lun path %s to group %s: %w ", targetLUN.Name, initatorGroup, err)
 	}
-	return err
+	return targetLUN, nil
 }
 
 func (c *NetappClonner) UnMap(initatorGroup string, targetLUN populator.LUN) error {
@@ -75,7 +75,7 @@ func (c *NetappClonner) ResolveVolumeHandleToLUN(volumeHandle string) (populator
 
 	// in RHEL lsblk needs that swap. In fedora it doesn't
 	//serialNumber :=  strings.ReplaceAll(l.SerialNumber, "?", "\\\\x3f")
-	naa := fmt.Sprintf("naa.%s%x", OntapProviderID, l.SerialNumber)
+	naa := fmt.Sprintf("%s%x", OntapProviderID, l.SerialNumber)
 	lun := populator.LUN{Name: l.Name, VolumeHandle: volumeHandle, NAA: naa}
 	return lun, nil
 }

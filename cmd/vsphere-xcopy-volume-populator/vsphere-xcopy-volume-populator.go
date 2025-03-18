@@ -4,7 +4,7 @@ import (
 	"context"
 	"flag"
 	"fmt"
-	"github.com/kubev2v/forklift/cmd/vsphere-xcopy-volume-populator/internal/par3"
+	"github.com/kubev2v/forklift/cmd/vsphere-xcopy-volume-populator/internal/primera3par"
 	"net/http"
 	"os"
 	"path"
@@ -72,10 +72,10 @@ func main() {
 			klog.Fatalf("failed to initialize ontap storage mapper with %s", err)
 		}
 		storageApi = &sm
-	case "par3":
-		sm, err := par3.NewPar3Clonner(storageHostname, storageUsername, storagePassword)
+	case "primera3par":
+		sm, err := primera3par.NewPrimera3ParClonner(storageHostname, storageUsername, storagePassword)
 		if err != nil {
-			klog.Fatalf("failed to initialize par3 clonner with %s", err)
+			klog.Fatalf("failed to initialize primera3par clonner with %s", err)
 		}
 		storageApi = &sm
 	default:

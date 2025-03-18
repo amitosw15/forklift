@@ -1,4 +1,4 @@
-package par3
+package primera3par
 
 import (
 	"testing"
@@ -7,17 +7,17 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestPar3Clonner(t *testing.T) {
-	mockClient := NewMockPar3Client()
-	clonner := Par3Clonner{client: mockClient}
+func TestPrimera3ParClonner(t *testing.T) {
+	mockClient := NewMockPrimera3ParClient()
+	clonner := Primera3ParClonner{client: mockClient}
 
-	targetLUN := &populator.LUN{
+	targetLUN := populator.LUN{
 		Name: "TestVolume",
 		IQN:  "iqn.1993-08.org.debian:01:test1234",
 	}
 	initiatorGroup := "TestInitiatorGroup"
 
-	mockClient.Volumes[targetLUN.Name] = *targetLUN
+	mockClient.Volumes[targetLUN.Name] = targetLUN
 
 	t.Run("Ensure Clonner Igroup", func(t *testing.T) {
 		err := clonner.EnsureClonnerIgroup(initiatorGroup, targetLUN.IQN)
@@ -29,12 +29,12 @@ func TestPar3Clonner(t *testing.T) {
 	})
 
 	t.Run("Map LUN", func(t *testing.T) {
-		err := clonner.Map(initiatorGroup, targetLUN)
+		_, err := clonner.Map(initiatorGroup, targetLUN)
 		assert.NoError(t, err, "Expected no error when mapping LUN")
 	})
 
 	t.Run("Current Mapped Groups", func(t *testing.T) {
-		groups, err := clonner.CurrentMappedGroups(*targetLUN)
+		groups, err := clonner.CurrentMappedGroups(targetLUN)
 		assert.NoError(t, err, "Expected no error when fetching mapped groups")
 		assert.Contains(t, groups, initiatorGroup, "Expected initiator group to be mapped")
 	})
@@ -45,7 +45,7 @@ func TestPar3Clonner(t *testing.T) {
 	})
 
 	t.Run("Unmap LUN", func(t *testing.T) {
-		err := clonner.UnMap(initiatorGroup, *targetLUN)
+		err := clonner.UnMap(initiatorGroup, targetLUN)
 		assert.NoError(t, err, "Expected no error when unmapping LUN")
 	})
 }

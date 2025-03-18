@@ -3,6 +3,7 @@ package populator
 import (
 	"context"
 	"fmt"
+	"slices"
 
 	"github.com/kubev2v/forklift/cmd/vsphere-xcopy-volume-populator/internal/vmware"
 	"k8s.io/klog/v2"
@@ -32,13 +33,20 @@ func NewWithRemoteEsxcli(storageApi StorageApi, vsphereHostname, vsphereUsername
 
 }
 
-func (p *RemoteEsxcliPopulator) Populate(sourceVMDKFile string, volumeHandle string, progress chan int, quit chan string) error {
+func (p *RemoteEsxcliPopulator) Populate(sourceVMDKFile string, volumeHandle string, progress chan int, quit chan string) (err error) {
+	defer func() {
+		if err != nil {
+			quit <- err.Error()
+		}
+	}()
 	vmDisk, err := ParseVmdkPath(sourceVMDKFile)
 	if err != nil {
 		return err
 	}
 	klog.Infof("Starting to populate using remote esxcli vmkfstools, source vmdk %s target LUN %s", sourceVMDKFile, volumeHandle)
 	host, err := p.VSphereClient.GetEsxByVm(context.Background(), vmDisk.VMName)
+	klog.Infof("Got ESXI host: %s", host)
+	klog.Infof("Got ESXI name: %s", host.Name())
 	if err != nil {
 		return err
 	}
@@ -68,32 +76,24 @@ func (p *RemoteEsxcliPopulator) Populate(sourceVMDKFile string, volumeHandle str
 	if err != nil {
 		return err
 	}
-
-	lun.IQN = esxIQN
 	originalInitiatorGroups, err := p.StorageApi.CurrentMappedGroups(lun)
 	if err != nil {
 		return fmt.Errorf("failed to fetch the current initiator groups of the lun %s: %w", lun.Name, err)
 	}
 
-	err = p.StorageApi.Map(xcopyInitiatorGroup, &lun)
+	lun, err = p.StorageApi.Map(xcopyInitiatorGroup, lun)
 	if err != nil {
 		return fmt.Errorf("failed to map lun %s to initiator group %s: %w", lun, xcopyInitiatorGroup, err)
 	}
+
 	defer func() {
-		shouldUnmap := true
-		for _, group := range originalInitiatorGroups {
-			if xcopyInitiatorGroup == group {
-				shouldUnmap = false
-			}
-		}
-		if shouldUnmap {
+		if !slices.Contains(originalInitiatorGroups, xcopyInitiatorGroup) {
 			p.StorageApi.UnMap(xcopyInitiatorGroup, lun)
 		}
 	}()
+	esxNaa := fmt.Sprintf("naa.%s", lun.NAA)
 
-	naa := lun.NAA
-
-	targetLUN := fmt.Sprintf("/vmfs/devices/disks/%s", naa)
+	targetLUN := fmt.Sprintf("/vmfs/devices/disks/%s", esxNaa)
 	klog.Infof("resolved lun with IQN %s to lun %s", lun.IQN, targetLUN)
 
 	_, err = p.VSphereClient.RunEsxCommand(context.Background(), host, []string{"storage", "core", "adapter", "rescan", "-a", "1"})
@@ -101,9 +101,9 @@ func (p *RemoteEsxcliPopulator) Populate(sourceVMDKFile string, volumeHandle str
 		return err
 	}
 
-	_, err = p.VSphereClient.RunEsxCommand(context.Background(), host, []string{"storage", "core", "device", "list", "-d", naa})
+	_, err = p.VSphereClient.RunEsxCommand(context.Background(), host, []string{"storage", "core", "device", "list", "-d", esxNaa})
 	if err != nil {
-		return fmt.Errorf("failed to locate the target LUN %s. Check the LUN details and the host mapping response: %s", naa, err)
+		return fmt.Errorf("failed to locate the target LUN %s. Check the LUN details and the host mapping response: %s", esxNaa, err)
 	}
 
 	r, err = p.VSphereClient.RunEsxCommand(context.Background(), host, []string{"vmkfstools", "clone", "-s", vmDisk.Path(), "-t", targetLUN})
