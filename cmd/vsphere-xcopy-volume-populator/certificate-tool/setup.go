@@ -1,16 +1,17 @@
 package main
 
 import (
-	"bufio"
 	"fmt"
+	"golang.org/x/term"
 	"log"
-	"os"
 	"os/exec"
 	"strings"
+	"syscall"
 )
 
 var sudoPassword string
-var valuesPath = "tests/e2e/primera-values.yaml"
+var configFiles = "cmd/vsphere-xcopy-volume-populator/certificate-tool/setup-env-files"
+var valuesPath = configFiles + "/primera-value.yaml"
 
 // RunCommand runs a shell command and tries without sudo first, then retries with sudo if needed.
 func RunCommand(cmdStr string) (string, error) {
@@ -29,16 +30,22 @@ func RunCommand(cmdStr string) (string, error) {
 }
 
 // AskForSudoPassword prompts the user for their sudo password before execution
-func AskForSudoPassword() {
-	fmt.Print("🔐 Enter your sudo password: ")
-	reader := bufio.NewReader(os.Stdin)
-	password, _ := reader.ReadString('\n')
-	sudoPassword = strings.TrimSpace(password)
+func AskForSudoPassword() error {
+	fmt.Print("Enter Password: ")
+	bytePassword, err := term.ReadPassword(int(syscall.Stdin))
+	if err != nil {
+		return err
+	}
+	sudoPassword = string(bytePassword)
+	return nil
 }
 
-func setupEnvironment() {
+func setup() {
 	// Ask for sudo password at the beginning
-	AskForSudoPassword()
+	err := AskForSudoPassword()
+	if err != nil {
+		log.Fatal(err)
+	}
 	defer func() {
 		fmt.Println("🔄 Cleaning up: Deleting Kind cluster...")
 		RunCommand("kind delete cluster --name copy-offload-test")
@@ -47,7 +54,7 @@ func setupEnvironment() {
 
 	// 1. Install Kind (if not installed)
 	fmt.Println("🔄 Checking if Kind is installed...")
-	_, err := RunCommand("kind version")
+	_, err = RunCommand("kind version")
 	if err != nil {
 		fmt.Println("⚠️  Kind not found. Installing...")
 		_, err = RunCommand("curl -Lo ./kind https://kind.sigs.k8s.io/dl/latest/kind-linux-amd64 && chmod +x ./kind && mv ./kind /usr/local/bin/")
@@ -127,7 +134,7 @@ func setupEnvironment() {
 
 	// 10. Creating secret, storage-class, pvc
 	fmt.Println("🔄 Creating backend secret")
-	var backendSecretPath = "tests/e2e/secret.yaml"
+	var backendSecretPath = configFiles + "/secret.yaml"
 	_, err = RunCommand(fmt.Sprintf("kubectl apply -f %v", backendSecretPath))
 	if err != nil {
 		log.Fatalf("❌ Failed to create secret: %v", err)
@@ -135,7 +142,7 @@ func setupEnvironment() {
 	fmt.Println("✅ Backend secret created!")
 
 	fmt.Println("🔄 Creating storage class")
-	var storageClass = "tests/e2e/hpe-3par-xfs-fs-storageclass.yaml"
+	var storageClass = configFiles + "/hpe-3par-xfs-fs-storageclass.yaml"
 	_, err = RunCommand(fmt.Sprintf("kubectl apply -f %v", storageClass))
 	if err != nil {
 		log.Fatalf("❌ Failed to create storage class: %v", err)
@@ -143,7 +150,7 @@ func setupEnvironment() {
 	fmt.Println("✅ storage class created!")
 
 	fmt.Println("🔄 Creating pvc")
-	var pvc = "tests/e2e/pvc-hpe-3par-xfs.yaml"
+	var pvc = configFiles + "/pvc-hpe-3par-xfs.yaml"
 	_, err = RunCommand(fmt.Sprintf("kubectl apply -f %v", pvc))
 	if err != nil {
 		log.Fatalf("❌ Failed to create pvc: %v", err)
