@@ -3,23 +3,92 @@ package main
 import (
 	"context"
 	"fmt"
-	"github.com/vmware/govmomi/object"
-	"github.com/vmware/govmomi/vim25/mo"
+	"github.com/vmware/govmomi"
+	"github.com/vmware/govmomi/find"
+	"github.com/vmware/govmomi/guest"
+	"github.com/vmware/govmomi/vim25/types"
 	"log"
 	"net/url"
 	"os"
-
-	"github.com/vmware/govmomi"
-	"github.com/vmware/govmomi/find"
-	"github.com/vmware/govmomi/vim25/types"
+	"os/exec"
+	"path/filepath"
 )
 
+const (
+	defaultURL = "https://cloud-images.ubuntu.com/releases/focal/release/ubuntu-20.04-server-cloudimg-amd64.vmdk"
+)
+
+func runCmd(cmdName string, args ...string) error {
+	fmt.Printf("Running: %s %v\n", cmdName, args)
+	cmd := exec.Command(cmdName, args...)
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+	return cmd.Run()
+}
+
+func CreateTestVMWithDiskAndISO(vmdkURL, vmName, isoPath, datastore string, skipUpload bool) error {
+	if vmdkURL == "" {
+		vmdkURL = defaultURL
+	}
+	vmdkFile := filepath.Base(vmdkURL)
+	vmdkRemotePath := fmt.Sprintf("%s/%s", vmName, vmdkFile)
+	if !skipUpload {
+		if _, err := os.Stat(vmdkFile); os.IsNotExist(err) {
+			fmt.Println("Downloading VMDK:", vmdkURL)
+			if err := runCmd("wget", vmdkURL); err != nil {
+				return fmt.Errorf("failed to download VMDK: %w", err)
+			}
+		} else {
+			fmt.Println("VMDK already exists locally, skipping download.")
+		}
+		if err := runCmd("govc", "import.vmdk", "-ds="+datastore, "-pool=Resources", vmdkFile, vmName); err != nil {
+			return fmt.Errorf("failed to upload VMDK: %w", err)
+		}
+	}
+
+	if err := runCmd("govc", "vm.create",
+		"-ds="+datastore,
+		"-g=ubuntu64Guest",
+		"-m=2048",
+		"-c=2",
+		"-net=VM Network",
+		"-on=false",
+		vmName,
+	); err != nil {
+		return fmt.Errorf("failed to create VM: %w", err)
+	}
+
+	if err := runCmd("govc", "vm.disk.attach",
+		"-vm="+vmName,
+		"-disk="+vmdkRemotePath,
+		"-ds="+datastore,
+	); err != nil {
+		return fmt.Errorf("failed to attach disk: %w", err)
+	}
+
+	if err := runCmd("govc", "device.cdrom.add", "-vm="+vmName); err != nil {
+		return fmt.Errorf("failed to add cdrom: %w", err)
+	}
+
+	if err := runCmd("govc", "device.connect", "-vm="+vmName, "cdrom-3000"); err != nil {
+		return fmt.Errorf("failed to connect cdrom: %w", err)
+	}
+
+	if err := runCmd("govc", "vm.power", "-on", vmName); err != nil {
+		return fmt.Errorf("failed to power on vm: %w", err)
+	}
+
+	fmt.Println("VM deployed and running!")
+	return nil
+}
+
 func main() {
-	vcURL := os.Getenv("GOVMOMI_URL")
-	user := os.Getenv("GOVMOMI_USERNAME")
-	pass := os.Getenv("GOVMOMI_PASSWORD")
-	//datastoreName := "eco-iscsi-ds1" // Extracted from 3par's info
-	vmName := "3par"
+	vcURL := os.Getenv("GOVC_URL")
+	user := os.Getenv("GOVC_USERNAME")
+	pass := os.Getenv("GOVC_PASSWORD")
+	////datastoreName := "eco-iscsi-ds1" // Extracted from 3par's info
+	////vmName := "3par"
+	////vmName := "3par-test-creation"
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
@@ -37,116 +106,44 @@ func main() {
 
 	// Find datacenter
 	finder := find.NewFinder(c.Client, true)
-
-	//createSingleVm(ctx, c, finder, vmName, datastoreName)
-	queryVM(ctx, c, finder, vmName)
-}
-
-func queryVM(ctx context.Context, c *govmomi.Client, finder *find.Finder, vmName string) {
 	dc, err := finder.DefaultDatacenter(ctx)
 	if err != nil {
 		log.Fatal("Failed to find default datacenter:", err)
 	}
 	finder.SetDatacenter(dc)
-
-	// Find the VM by name
-	vm, err := finder.VirtualMachine(ctx, vmName)
-	if err != nil {
-		log.Fatal("Failed to find VM:", err)
-	}
-
-	// Retrieve VM properties
-	var vmProps mo.VirtualMachine
-	err = vm.Properties(ctx, vm.Reference(), []string{"summary", "config.hardware.device", "resourcePool"}, &vmProps)
-	if err != nil {
-		log.Fatal("Failed to retrieve VM properties:", err)
-	}
-	// Get the resource pool reference
-	resourcePoolRef := vmProps.ResourcePool
-	if resourcePoolRef == nil {
-		log.Fatal("VM does not belong to any resource pool")
-	}
-
-	// Convert the resource pool reference into a govmomi object
-	rp := object.NewResourcePool(c.Client, *resourcePoolRef)
-
-	// Get the resource pool name
-
-	rpName, err := rp.ObjectName(ctx)
-	if err != nil {
-		log.Fatal("Failed to get resource pool name:", err)
-	}
-
-	// Print VM details
-	fmt.Println("\n--- VM Information ---")
-	fmt.Printf("Name: %s\n", vmProps.Summary.Config.Name)
-	fmt.Printf("Guest OS: %s\n", vmProps.Summary.Config.GuestId)
-	fmt.Printf("CPU: %d\n", vmProps.Summary.Config.NumCpu)
-	fmt.Printf("Memory: %d MB\n", vmProps.Summary.Config.MemorySizeMB)
-	fmt.Printf("Power State: %s\n", vmProps.Summary.Runtime.PowerState)
-	fmt.Printf("VM Path: %s\n", vmProps.Summary.Config.VmPathName)
-	fmt.Printf("VM: %s is in Resource Pool: %s\n", vmName, rpName)
-
-	// Print network details
-	fmt.Println("\n--- Network Information ---")
-	for _, device := range vmProps.Config.Hardware.Device {
-		if nic, ok := device.(*types.VirtualEthernetCard); ok {
-			fmt.Printf("Network Adapter: %s\n", nic.DeviceInfo.GetDescription().Summary)
-		}
-	}
-
-	fmt.Println("\n--- Verification Complete ---")
+	//CreateTestVMWithDiskAndISO("", "ubuntu-automate-test", "automatic-vm-creation-test/seed2.iso", "eco-iscsi-ds1", true)
+	changeFileSystem(ctx, c, finder, "ubuntu-automate-test", "fedora", "password", 1)
 }
 
-func createSingleVm(ctx context.Context, c *govmomi.Client, finder *find.Finder, vmName, datastoreName string) error {
-	// Find datacenter
-	dc, err := finder.DefaultDatacenter(ctx)
+func changeFileSystem(ctx context.Context, c *govmomi.Client, finder *find.Finder, vmName, guestUser, guestPass string, sizeMB int) error {
+	fmt.Println("Changing filesystem")
+	vm, err := finder.VirtualMachine(ctx, vmName)
 	if err != nil {
-		return fmt.Errorf("failed to find default datacenter: %w", err)
+		fmt.Println("Failed to find VM:", err)
+		return fmt.Errorf("failed to find VM: %w", err)
 	}
-	finder.SetDatacenter(dc)
-
-	// Find VM folder
-	folder, err := finder.Folder(ctx, "vm")
+	guestOpsMgr := guest.NewOperationsManager(c.Client, vm.Reference())
+	// Guest authentication
+	auth := &types.NamePasswordAuthentication{
+		Username: guestUser,
+		Password: guestPass,
+	}
+	fmt.Println("Creating process....")
+	procManager, err := guestOpsMgr.ProcessManager(ctx)
+	var programSpec types.GuestProgramSpec
+	filePath := fmt.Sprintf("/tmp/vm-%s-%s.xcopy", vmName, guestUser)
+	command := fmt.Sprintf("-c 'touch %s && dd if=/dev/urandom of=%s bs=1M count=%d 2>&1'", filePath, filePath, sizeMB)
+	fmt.Println(command)
+	programSpec = types.GuestProgramSpec{
+		ProgramPath: "/bin/sh",
+		Arguments:   command,
+	}
+	// Execute command inside the guest
+	pid, err := procManager.StartProgram(ctx, auth, &programSpec)
 	if err != nil {
-		return fmt.Errorf("failed to find VM folder: %w", err)
+		fmt.Println("Failed to start program:", err)
+		return fmt.Errorf("failed to start guest process: %w", err)
 	}
-
-	// Find resource pool
-	pool, err := finder.DefaultResourcePool(ctx)
-	if err != nil {
-		return fmt.Errorf("failed to find default resource pool: %w", err)
-	}
-
-	// Find datastore
-	datastore, err := finder.Datastore(ctx, datastoreName)
-	if err != nil {
-		return fmt.Errorf("failed to find datastore: %w", err)
-	}
-
-	// Define VM configuration
-	spec := types.VirtualMachineConfigSpec{
-		Name:     vmName,
-		GuestId:  "fedoraGuest",
-		MemoryMB: 2048,
-		NumCPUs:  2,
-		Files: &types.VirtualMachineFileInfo{
-			VmPathName: fmt.Sprintf("[%s]", datastore.Name()),
-		},
-	}
-
-	// Create the VM
-	task, err := folder.CreateVM(ctx, spec, pool, nil)
-	if err != nil {
-		return fmt.Errorf("failed to create VM: %w", err)
-	}
-
-	// Wait for task completion
-	_, err = task.WaitForResult(ctx, nil)
-	if err != nil {
-		return fmt.Errorf("VM creation task failed: %w", err)
-	}
-
-	fmt.Println("VM successfully created:", vmName)
+	log.Printf("Started process inside VM with PID: %d", pid)
 	return nil
 }
