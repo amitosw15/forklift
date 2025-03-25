@@ -8,7 +8,6 @@ import (
 	"github.com/vmware/govmomi/guest"
 	"github.com/vmware/govmomi/vim25/types"
 	"log"
-	"net/url"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -70,6 +69,14 @@ func CreateTestVMWithDiskAndISO(vmdkURL, vmName, isoPath, datastore string, skip
 		return fmt.Errorf("failed to add cdrom: %w", err)
 	}
 
+	if err := runCmd("govc", "device.cdrom.insert",
+		"-vm="+vmName,
+		"-device=cdrom-3000",
+		isoPath,
+	); err != nil {
+		return fmt.Errorf("failed to insert seed ISO: %w", err)
+	}
+
 	if err := runCmd("govc", "device.connect", "-vm="+vmName, "cdrom-3000"); err != nil {
 		return fmt.Errorf("failed to connect cdrom: %w", err)
 	}
@@ -83,36 +90,42 @@ func CreateTestVMWithDiskAndISO(vmdkURL, vmName, isoPath, datastore string, skip
 }
 
 func main() {
-	vcURL := os.Getenv("GOVC_URL")
-	user := os.Getenv("GOVC_USERNAME")
-	pass := os.Getenv("GOVC_PASSWORD")
-	////datastoreName := "eco-iscsi-ds1" // Extracted from 3par's info
-	////vmName := "3par"
-	////vmName := "3par-test-creation"
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-
-	// Connect to vCenter
-	u, err := url.Parse(vcURL)
-	if err != nil {
-		log.Fatal("Error parsing vCenter URL:", err)
-	}
-	u.User = url.UserPassword(user, pass)
-	c, err := govmomi.NewClient(ctx, u, true)
-	if err != nil {
-		log.Fatal("Failed to connect to vCenter:", err)
-	}
-	defer c.Logout(ctx)
-
-	// Find datacenter
-	finder := find.NewFinder(c.Client, true)
-	dc, err := finder.DefaultDatacenter(ctx)
-	if err != nil {
-		log.Fatal("Failed to find default datacenter:", err)
-	}
-	finder.SetDatacenter(dc)
-	//CreateTestVMWithDiskAndISO("", "ubuntu-automate-test", "automatic-vm-creation-test/seed2.iso", "eco-iscsi-ds1", true)
-	changeFileSystem(ctx, c, finder, "ubuntu-automate-test", "fedora", "password", 1)
+	//vcURL := os.Getenv("GOVC_URL")
+	//user := os.Getenv("GOVC_USERNAME")
+	//pass := os.Getenv("GOVC_PASSWORD")
+	//////datastoreName := "eco-iscsi-ds1" // Extracted from 3par's info
+	//vmName := "ubuntu-automate-test2"
+	//ctx, cancel := context.WithCancel(context.Background())
+	//defer cancel()
+	//
+	//// Connect to vCenter
+	//u, err := url.Parse(vcURL)
+	//if err != nil {
+	//	log.Fatal("Error parsing vCenter URL:", err)
+	//}
+	//u.User = url.UserPassword(user, pass)
+	//c, err := govmomi.NewClient(ctx, u, true)
+	//if err != nil {
+	//	log.Fatal("Failed to connect to vCenter:", err)
+	//}
+	//defer c.Logout(ctx)
+	//
+	//// Find datacenter
+	//finder := find.NewFinder(c.Client, true)
+	//dc, err := finder.DefaultDatacenter(ctx)
+	//if err != nil {
+	//	log.Fatal("Failed to find default datacenter:", err)
+	//}
+	//finder.SetDatacenter(dc)
+	////err = CreateTestVMWithDiskAndISO("", vmName, "automatic-vm-creation-test/seed2.iso", "eco-iscsi-ds1", false)
+	////if err != nil {
+	////	log.Fatal(err)
+	////}
+	//err = changeFileSystem(ctx, c, finder, vmName, "fedora", "password", 1)
+	//if err != nil {
+	//	log.Fatal(err)
+	//}
+	setup(false)
 }
 
 func changeFileSystem(ctx context.Context, c *govmomi.Client, finder *find.Finder, vmName, guestUser, guestPass string, sizeMB int) error {

@@ -10,13 +10,13 @@ import (
 )
 
 var sudoPassword string
-var configFiles = "cmd/vsphere-xcopy-volume-populator/certificate-tool/setup-env-files"
-var valuesPath = configFiles + "/primera-value.yaml"
+var configFiles = "./setup-env-files"
+var valuesPath = configFiles + "/primera-values.yaml"
 
 // RunCommand runs a shell command and tries without sudo first, then retries with sudo if needed.
-func RunCommand(cmdStr string) (string, error) {
+func RunCommand(cmdStr string, args ...string) (string, error) {
 	fmt.Println("Executing:", cmdStr)
-	cmd := exec.Command("bash", "-c", cmdStr)
+	cmd := exec.Command(cmdStr, args...)
 	output, err := cmd.CombinedOutput()
 	fmt.Println("Output:", string(output))
 	if err != nil {
@@ -40,16 +40,18 @@ func AskForSudoPassword() error {
 	return nil
 }
 
-func setup() {
+func setup(deleteCluster bool) {
 	// Ask for sudo password at the beginning
 	err := AskForSudoPassword()
 	if err != nil {
 		log.Fatal(err)
 	}
 	defer func() {
-		fmt.Println("🔄 Cleaning up: Deleting Kind cluster...")
-		RunCommand("kind delete cluster --name copy-offload-test")
-		fmt.Println("✅ Kind cluster deleted!")
+		if deleteCluster {
+			fmt.Println("🔄 Cleaning up: Deleting Kind cluster...")
+			RunCommand("kind delete cluster --name copy-offload-test")
+			fmt.Println("✅ Kind cluster deleted!")
+		}
 	}()
 
 	// 1. Install Kind (if not installed)
@@ -159,6 +161,5 @@ func setup() {
 
 	// 9. Continuously print pod status until 'q' is entered
 	fmt.Println("🔄 Fetching pvc status (Press 'q' to quit)...")
-
 	fmt.Println("🚀 Kind cluster with multipathd and HPE CSI Driver is ready!")
 }
