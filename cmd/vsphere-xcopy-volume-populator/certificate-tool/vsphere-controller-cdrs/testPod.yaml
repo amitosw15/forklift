@@ -1,0 +1,17 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: ubi-micro-pod
+  namespace: default
+spec:
+  containers:
+    - name: ubi-micro-container
+      image: registry.access.redhat.com/ubi9/ubi-micro
+      command: ["/bin/sh", "-c", "ls -la /dev/block"]
+      volumeDevices:
+        - name: test-volume
+          devicePath: /dev/block  # this is the path *inside* the container
+  volumes:
+    - name: test-volume
+      persistentVolumeClaim:
+        claimName: hpe-3par-block-pvc

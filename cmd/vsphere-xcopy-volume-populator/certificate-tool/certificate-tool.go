@@ -125,7 +125,8 @@ func main() {
 	//if err != nil {
 	//	log.Fatal(err)
 	//}
-	setup(false)
+	//setup(false)
+
 }
 
 func changeFileSystem(ctx context.Context, c *govmomi.Client, finder *find.Finder, vmName, guestUser, guestPass string, sizeMB int) error {

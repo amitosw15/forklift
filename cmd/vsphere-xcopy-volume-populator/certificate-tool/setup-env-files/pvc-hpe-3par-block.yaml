@@ -1,7 +1,7 @@
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
-  name: hpe-3par-xfs-pvc
+  name: hpe-3par-block-pvc
   namespace: default
 spec:
   accessModes:
@@ -17,6 +17,6 @@ spec:
   resources:
     requests:
       storage: 5Gi  # Adjust the size as needed
-  storageClassName: hpe-3par-xfs
+  storageClassName: hpe-3par-isci-block-rwx
   volumeMode: Block  # Since the StorageClass has fstype=xfs
 
