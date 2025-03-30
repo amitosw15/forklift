@@ -3,10 +3,12 @@ package main
 import (
 	"context"
 	"fmt"
+	"github.com/konveyor/forklift-controller/tests/suit/framework"
 	"github.com/vmware/govmomi"
 	"github.com/vmware/govmomi/find"
 	"github.com/vmware/govmomi/guest"
 	"github.com/vmware/govmomi/vim25/types"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"log"
 	"os"
 	"os/exec"
@@ -126,7 +128,7 @@ func main() {
 	//	log.Fatal(err)
 	//}
 	//setup(false)
-
+	cluster()
 }
 
 func changeFileSystem(ctx context.Context, c *govmomi.Client, finder *find.Finder, vmName, guestUser, guestPass string, sizeMB int) error {
@@ -160,4 +162,35 @@ func changeFileSystem(ctx context.Context, c *govmomi.Client, finder *find.Finde
 	}
 	log.Printf("Started process inside VM with PID: %d", pid)
 	return nil
+}
+
+func cluster() {
+	// Set this to point to your actual kubeconfig
+	kubeconfigPath := "/home/you/.kube/config"
+
+	framework.ClientsInstance.KubeConfig = kubeconfigPath
+	framework.ClientsInstance.KubeURL = "" // usually left empty unless you're overriding cluster
+
+	// Load REST config
+	restConfig, err := framework.ClientsInstance.LoadConfig()
+	if err != nil {
+		log.Fatalf("failed to load kube config: %v", err)
+	}
+	framework.ClientsInstance.RestConfig = restConfig
+
+	// Connect to Kubernetes
+	clientset, err := framework.ClientsInstance.GetKubeClient()
+	if err != nil {
+		log.Fatalf("failed to connect to k8s: %v", err)
+	}
+
+	// Verify connection by listing namespaces
+	namespaces, err := clientset.CoreV1().Namespaces().List(context.TODO(), metav1.ListOptions{})
+	if err != nil {
+		log.Fatalf("failed to list namespaces: %v", err)
+	}
+	fmt.Println("Namespaces:")
+	for _, ns := range namespaces.Items {
+		fmt.Println(" -", ns.Name)
+	}
 }

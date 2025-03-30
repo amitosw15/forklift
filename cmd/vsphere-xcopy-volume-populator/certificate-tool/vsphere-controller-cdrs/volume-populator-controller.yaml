@@ -18,6 +18,7 @@ spec:
       - args:
         - -v
         - "5"
+        - --cr-namespace=populators-ns
         env:
         - name: POD_NAMESPACE
           valueFrom:

@@ -21,6 +21,17 @@ override SERVICE_PORT ?= $(shell ( yq e '.servicePort // ""' $(ENV_FILE) 2>/dev/
 override USERNAME ?= $(shell ( yq e '.username // ""' $(ENV_FILE) 2>/dev/null ))
 
 
+OPENSTACK_POPULATOR ?= forklift.konveyor.io_openstackvolumepopulators.yaml
+OVIRT_POPULATOR     ?= forklift.konveyor.io_ovirtvolumepopulators.yaml
+VSPHERE_POPULATOR ?= forklift.konveyor.io_vspherexcopyvolumepopulators.yaml
+
+.PHONY: deploy-prerequisites
+deploy-prerequisites:
+	@kubectl apply -f $(OPENSTACK_POPULATOR)
+	@kubectl apply -f $(OVIRT_POPULATOR)
+	@kubectl apply -f $(VSPHERE_POPULATOR)
+	@kubectl apply -f $(STORAGE_SECRET)
+
 .PHONY: read-config
 read-config:
 	@if [ ! -f "$(CONFIG_FILE)" ] || [ ! -s "$(CONFIG_FILE)" ]; then \
