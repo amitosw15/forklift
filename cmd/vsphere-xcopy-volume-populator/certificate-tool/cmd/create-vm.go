@@ -189,7 +189,7 @@ func init() {
 	rootCmd.AddCommand(createVmCmd)
 	createVmCmd.Flags().StringVar(&vmdkURL, "vmdk-url", "", "URL to the VMDK image (default downloads if empty)")
 	createVmCmd.Flags().StringVar(&vmName, "vm-name", "", "Name of the VM")
-	createVmCmd.Flags().StringVar(&isoPath, "iso-path", "", "Path to the ISO file")
+	createVmCmd.Flags().StringVar(&isoPath, "iso-path", "seed.iso", "Path to the ISO file")
 	createVmCmd.Flags().StringVar(&datastore, "datastore", "", "Datastore to use")
 	createVmCmd.Flags().BoolVar(&skipUpload, "skip-upload", false, "Skip uploading the VMDK if it exists")
 

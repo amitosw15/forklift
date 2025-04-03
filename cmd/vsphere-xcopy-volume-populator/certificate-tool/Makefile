@@ -49,7 +49,7 @@ BINARY = certificate-tool
 # -----------------------------------------------------------------------------
 # Targets
 # -----------------------------------------------------------------------------
-.PHONY: help deploy-prerequisites read-config build create-env create-vm create-pvc create-cr test-xcopy all clean
+.PHONY: help deploy-prerequisites read-config build create-populator-env create-test-env test-xcopy all clean
 
 help: ## Display this help.
 	@awk 'BEGIN {FS = ":.*##"; printf "\nUsage:\n  make \033[36m<target>\033[0m\n"} \
