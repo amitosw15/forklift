@@ -142,6 +142,7 @@ func getVXPopulatorPodArgs(_ bool, u *unstructured.Unstructured) ([]string, erro
 		"--source-vmdk=" + xcopy.Spec.VmdkPath,
 		"--target-pvc=" + xcopy.Spec.TargetPVC,
 		"--target-namespace=" + xcopy.GetNamespace(),
+		"--storage-vendor=" + xcopy.Spec.StorageVendorProduct,
 		"--cr-name=" + xcopy.Name,
 		"--cr-namespace=" + xcopy.Namespace,
 		"--secret-name=" + xcopy.Spec.SecretRef,

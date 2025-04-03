@@ -1,4 +1,4 @@
-package main
+package storage_vendors
 
 import (
 	"fmt"
@@ -10,7 +10,7 @@ import (
 )
 
 var sudoPassword string
-var configFiles = "./setup-env-files"
+var configFiles = "./storage-vendors"
 var valuesPath = configFiles + "/primera-values.yaml"
 
 // RunCommand runs a shell command and tries without sudo first, then retries with sudo if needed.
@@ -136,7 +136,7 @@ func setup(deleteCluster bool) {
 
 	// 10. Creating secret, storage-class, pvc
 	fmt.Println("🔄 Creating backend secret")
-	var backendSecretPath = configFiles + "/secret.yaml"
+	var backendSecretPath = configFiles + "/storage-secret.yaml"
 	_, err = RunCommand(fmt.Sprintf("kubectl apply -f %v", backendSecretPath))
 	if err != nil {
 		log.Fatalf("❌ Failed to create secret: %v", err)
