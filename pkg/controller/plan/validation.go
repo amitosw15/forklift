@@ -1,15 +1,18 @@
 package plan
 
 import (
+	"bytes"
 	"context"
 	"crypto/md5"
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"net"
 	"path"
 	"strconv"
+	"text/template"
 
-	net "github.com/k8snetworkplumbingwg/network-attachment-definition-client/pkg/apis/k8s.cni.cncf.io/v1"
+	k8snet "github.com/k8snetworkplumbingwg/network-attachment-definition-client/pkg/apis/k8s.cni.cncf.io/v1"
 	api "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1"
 	refapi "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1/ref"
 	"github.com/konveyor/forklift-controller/pkg/controller/plan/adapter"
@@ -25,6 +28,7 @@ import (
 	core "k8s.io/api/core/v1"
 	v1 "k8s.io/api/core/v1"
 	k8serr "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/resource"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	k8svalidation "k8s.io/apimachinery/pkg/util/validation"
@@ -162,6 +166,69 @@ func (r *Reconciler) validate(plan *api.Plan) error {
 		return err
 	}
 
+	// Validate PVC name template
+	if err := r.validatePVCNameTemplate(plan); err != nil {
+		return err
+	}
+
+	// Validate volume name template
+	if err := r.validateVolumeNameTemplate(plan); err != nil {
+		return err
+	}
+
+	// Validate network name template
+	if err := r.validateNetworkNameTemplate(plan); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (r *Reconciler) validatePVCNameTemplate(plan *api.Plan) error {
+	if err := r.IsValidPVCNameTemplate(plan.Spec.PVCNameTemplate); err != nil {
+		invalidPVCNameTemplate := libcnd.Condition{
+			Type:     NotValid,
+			Status:   True,
+			Category: Critical,
+			Message:  "PVC name template is invalid.",
+			Items:    []string{},
+		}
+
+		plan.Status.SetCondition(invalidPVCNameTemplate)
+	}
+
+	return nil
+}
+
+func (r *Reconciler) validateVolumeNameTemplate(plan *api.Plan) error {
+	if err := r.IsValidVolumeNameTemplate(plan.Spec.VolumeNameTemplate); err != nil {
+		invalidPVCNameTemplate := libcnd.Condition{
+			Type:     NotValid,
+			Status:   True,
+			Category: Critical,
+			Message:  "Volume name template is invalid.",
+			Items:    []string{},
+		}
+
+		plan.Status.SetCondition(invalidPVCNameTemplate)
+	}
+
+	return nil
+}
+
+func (r *Reconciler) validateNetworkNameTemplate(plan *api.Plan) error {
+	if err := r.IsValidNetworkNameTemplate(plan.Spec.NetworkNameTemplate); err != nil {
+		invalidPVCNameTemplate := libcnd.Condition{
+			Type:     NotValid,
+			Status:   True,
+			Category: Critical,
+			Message:  "Network name template is invalid.",
+			Items:    []string{},
+		}
+
+		plan.Status.SetCondition(invalidPVCNameTemplate)
+	}
+
 	return nil
 }
 
@@ -256,7 +323,7 @@ func (r *Reconciler) validateTargetNamespace(plan *api.Plan) (err error) {
 		plan.Status.SetCondition(newCnd)
 		return
 	}
-	if len(k8svalidation.IsDNS1123Label(plan.Spec.TargetNamespace)) > 0 {
+	if len(k8svalidation.IsDNS1123Subdomain(plan.Spec.TargetNamespace)) > 0 {
 		newCnd.Reason = NotValid
 		plan.Status.SetCondition(newCnd)
 	}
@@ -440,8 +507,8 @@ func (r *Reconciler) validateVM(plan *api.Plan) error {
 		Type:     VMMissingGuestIPs,
 		Status:   True,
 		Reason:   MissingGuestInfo,
-		Category: Critical,
-		Message:  "Guest information on vNICs is missing, cannot preserve static IPs. Make sure VMware tools are installed and the VM is running.",
+		Category: Warn,
+		Message:  "Guest information on vNICs is missing, cannot preserve static IPs. If this machine has static IP, make sure VMware tools are installed and the VM is running.",
 		Items:    []string{},
 	}
 	missingCbtForWarm := libcnd.Condition{
@@ -450,6 +517,27 @@ func (r *Reconciler) validateVM(plan *api.Plan) error {
 		Reason:   MissingChangedBlockTracking,
 		Category: Critical,
 		Message:  "Changed Block Tracking (CBT) has not been enabled on some VM. This feature is a prerequisite for VM warm migration.",
+		Items:    []string{},
+	}
+	pvcNameInvalid := libcnd.Condition{
+		Type:     NotValid,
+		Status:   True,
+		Category: Critical,
+		Message:  "VM PVC name template is invalid.",
+		Items:    []string{},
+	}
+	volumeNameInvalid := libcnd.Condition{
+		Type:     NotValid,
+		Status:   True,
+		Category: Critical,
+		Message:  "VM volume name template is invalid.",
+		Items:    []string{},
+	}
+	networkNameInvalid := libcnd.Condition{
+		Type:     NotValid,
+		Status:   True,
+		Category: Critical,
+		Message:  "VM network name template is invalid.",
 		Items:    []string{},
 	}
 
@@ -489,7 +577,7 @@ func (r *Reconciler) validateVM(plan *api.Plan) error {
 			}
 			return liberr.Wrap(pErr)
 		}
-		if len(k8svalidation.IsDNS1123Label(ref.Name)) > 0 {
+		if len(k8svalidation.IsDNS1123Subdomain(ref.Name)) > 0 {
 			nameNotValid.Items = append(nameNotValid.Items, ref.String())
 		}
 		if _, found := setOf[ref.ID]; found {
@@ -587,6 +675,24 @@ func (r *Reconciler) validateVM(plan *api.Plan) error {
 				missingCbtForWarm.Items = append(missingCbtForWarm.Items, ref.String())
 			}
 		}
+		// is valid vm pvc name template
+		if plan.Spec.VMs[i].PVCNameTemplate != "" {
+			if err := r.IsValidPVCNameTemplate(plan.Spec.VMs[i].PVCNameTemplate); err != nil {
+				pvcNameInvalid.Items = append(pvcNameInvalid.Items, ref.String())
+			}
+		}
+		// is valid vm pvc name template
+		if plan.Spec.VMs[i].VolumeNameTemplate != "" {
+			if err := r.IsValidVolumeNameTemplate(plan.Spec.VMs[i].VolumeNameTemplate); err != nil {
+				volumeNameInvalid.Items = append(volumeNameInvalid.Items, ref.String())
+			}
+		}
+		// is valid vm pvc name template
+		if plan.Spec.VMs[i].NetworkNameTemplate != "" {
+			if err := r.IsValidNetworkNameTemplate(plan.Spec.VMs[i].NetworkNameTemplate); err != nil {
+				networkNameInvalid.Items = append(networkNameInvalid.Items, ref.String())
+			}
+		}
 	}
 	if len(notFound.Items) > 0 {
 		plan.Status.SetCondition(notFound)
@@ -624,6 +730,15 @@ func (r *Reconciler) validateVM(plan *api.Plan) error {
 	if len(missingCbtForWarm.Items) > 0 {
 		plan.Status.SetCondition(missingCbtForWarm)
 	}
+	if len(pvcNameInvalid.Items) > 0 {
+		plan.Status.SetCondition(pvcNameInvalid)
+	}
+	if len(volumeNameInvalid.Items) > 0 {
+		plan.Status.SetCondition(volumeNameInvalid)
+	}
+	if len(networkNameInvalid.Items) > 0 {
+		plan.Status.SetCondition(networkNameInvalid)
+	}
 
 	return nil
 }
@@ -640,11 +755,18 @@ func (r *Reconciler) validateTransferNetwork(plan *api.Plan) (err error) {
 		Reason:   NotFound,
 		Message:  "Transfer network is not valid.",
 	}
+	notValid := libcnd.Condition{
+		Type:     TransferNetNotValid,
+		Status:   True,
+		Category: Critical,
+		Reason:   NotValid,
+		Message:  "Transfer network default route annotation is not a valid IP address.",
+	}
 	key := client.ObjectKey{
 		Namespace: plan.Spec.TransferNetwork.Namespace,
 		Name:      plan.Spec.TransferNetwork.Name,
 	}
-	netAttachDef := &net.NetworkAttachmentDefinition{}
+	netAttachDef := &k8snet.NetworkAttachmentDefinition{}
 	err = r.Get(context.TODO(), key, netAttachDef)
 	if k8serr.IsNotFound(err) {
 		err = nil
@@ -653,6 +775,15 @@ func (r *Reconciler) validateTransferNetwork(plan *api.Plan) (err error) {
 	}
 	if err != nil {
 		err = liberr.Wrap(err)
+		return
+	}
+	route, found := netAttachDef.Annotations[AnnForkliftNetworkRoute]
+	if !found {
+		return
+	}
+	ip := net.ParseIP(route)
+	if ip == nil {
+		plan.Status.SetCondition(notValid)
 	}
 
 	return
@@ -999,6 +1130,16 @@ func createVddkCheckJob(plan *api.Plan) *batchv1.Job {
 					Drop: []core.Capability{"ALL"},
 				},
 			},
+			Resources: core.ResourceRequirements{
+				Requests: core.ResourceList{
+					core.ResourceCPU:    resource.MustParse("100m"),
+					core.ResourceMemory: resource.MustParse("150Mi"),
+				},
+				Limits: core.ResourceList{
+					core.ResourceCPU:    resource.MustParse("1000m"),
+					core.ResourceMemory: resource.MustParse("500Mi"),
+				},
+			},
 		},
 	}
 
@@ -1040,7 +1181,17 @@ func createVddkCheckJob(plan *api.Plan) *batchv1.Job {
 					InitContainers:  initContainers,
 					Containers: []core.Container{
 						{
-							Name:  "validator",
+							Name: "validator",
+							Resources: core.ResourceRequirements{
+								Requests: core.ResourceList{
+									core.ResourceCPU:    resource.MustParse("100m"),
+									core.ResourceMemory: resource.MustParse("150Mi"),
+								},
+								Limits: core.ResourceList{
+									core.ResourceCPU:    resource.MustParse("1000m"),
+									core.ResourceMemory: resource.MustParse("500Mi"),
+								},
+							},
 							Image: Settings.Migration.VirtV2vImage,
 							SecurityContext: &core.SecurityContext{
 								AllowPrivilegeEscalation: ptr.To(false),
@@ -1094,6 +1245,105 @@ func (r *Reconciler) checkOCPVersion(clientset kubernetes.Interface) error {
 
 	if major < 1 || (major == 1 && minor < 26) {
 		return liberr.New("source provider version is not supported")
+	}
+
+	return nil
+}
+
+func (r *Reconciler) IsValidTemplate(templateStr string, testData interface{}) (string, error) {
+	// Validate golang template syntax
+	tmpl, err := template.New("template").Parse(templateStr)
+	if err != nil {
+		return "", liberr.Wrap(err, "Invalid template syntax")
+	}
+
+	var buf bytes.Buffer
+	err = tmpl.Execute(&buf, testData)
+	if err != nil {
+		return "", liberr.Wrap(err, "Template execution failed")
+	}
+	result := buf.String()
+
+	// Empty output is not valid
+	if result == "" {
+		return "", liberr.New("Template output is empty")
+	}
+
+	return result, nil
+}
+
+func (r *Reconciler) IsValidPVCNameTemplate(pvcNameTemplate string) error {
+	if pvcNameTemplate == "" {
+		return nil
+	}
+
+	// Test template with sample data
+	testData := api.PVCNameTemplateData{
+		VmName:        "test-vm",
+		PlanName:      "test-plan",
+		DiskIndex:     0,
+		RootDiskIndex: 0,
+	}
+
+	result, err := r.IsValidTemplate(pvcNameTemplate, testData)
+	if err != nil {
+		return err
+	}
+
+	// Validate that template output is a valid k8s label
+	errs := k8svalidation.IsValidLabelValue(result)
+	if len(errs) > 0 {
+		return liberr.New("Template output is not a valid k8s label", "errors", errs)
+	}
+
+	return nil
+}
+
+func (r *Reconciler) IsValidVolumeNameTemplate(volumeNameTemplate string) error {
+	if volumeNameTemplate == "" {
+		return nil
+	}
+
+	testData := api.VolumeNameTemplateData{
+		PVCName:     "test-pvc",
+		VolumeIndex: 0,
+	}
+
+	result, err := r.IsValidTemplate(volumeNameTemplate, testData)
+	if err != nil {
+		return err
+	}
+
+	// Validate that template output is a valid k8s label
+	errs := k8svalidation.IsValidLabelValue(result)
+	if len(errs) > 0 {
+		return liberr.New("Template output is not a valid k8s label", "errors", errs)
+	}
+
+	return nil
+}
+
+func (r *Reconciler) IsValidNetworkNameTemplate(networkNameTemplate string) error {
+	if networkNameTemplate == "" {
+		return nil
+	}
+
+	testData := api.NetworkNameTemplateData{
+		NetworkName:      "test-network",
+		NetworkNamespace: "test-namespace",
+		NetworkType:      "Multus",
+		NetworkIndex:     0,
+	}
+
+	result, err := r.IsValidTemplate(networkNameTemplate, testData)
+	if err != nil {
+		return err
+	}
+
+	// Validate that template output is a valid k8s label
+	errs := k8svalidation.IsValidLabelValue(result)
+	if len(errs) > 0 {
+		return liberr.New("Template output is not a valid k8s label", "errors", errs)
 	}
 
 	return nil

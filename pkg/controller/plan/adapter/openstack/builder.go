@@ -94,13 +94,6 @@ const (
 	SecureBootOptional = "optional"
 )
 
-// Machine types
-const (
-	PC    = "pc"
-	Q35   = "q35"
-	PcQ35 = "pc-q35"
-)
-
 // Firmware types
 const (
 	BIOS = "bios"
@@ -204,7 +197,6 @@ const (
 	CpuSockets           = "hw_cpu_sockets"
 	CpuThreads           = "hw_cpu_threads"
 	FirmwareType         = "hw_firmware_type"
-	MachineType          = "hw_machine_type"
 	CdromBus             = "hw_cdrom_bus"
 	PointerModel         = "hw_pointer_model"
 	VideoModel           = "hw_video_model"
@@ -247,7 +239,6 @@ var DefaultProperties = map[string]string{
 	CpuPolicy:       CpuPolicyShared,
 	CpuThreadPolicy: CpuThreadPolicyPrefer,
 	FirmwareType:    BIOS,
-	MachineType:     PC,
 	CdromBus:        IdeBus,
 	PointerModel:    UsbTablet,
 	VideoModel:      VideoVirtio,
@@ -407,8 +398,6 @@ func (r *Builder) mapInput(vm *model.Workload, object *cnv.VirtualMachineSpec) {
 }
 
 func (r *Builder) mapResources(vm *model.Workload, object *cnv.VirtualMachineSpec, usesInstanceType bool) {
-	// KubeVirt supports Q35 or PC-Q35 machine types only.
-	object.Template.Spec.Domain.Machine = &cnv.Machine{Type: Q35}
 	if usesInstanceType {
 		return
 	}
@@ -440,11 +429,7 @@ func (r *Builder) mapResources(vm *model.Workload, object *cnv.VirtualMachineSpe
 
 	// TODO Support HugePages
 	memory := resource.NewQuantity(int64(vm.Flavor.RAM)*1024*1024, resource.BinarySI)
-	resourceRequests := map[core.ResourceName]resource.Quantity{}
-	resourceRequests[core.ResourceMemory] = *memory
 	object.Template.Spec.Domain.Memory = &cnv.Memory{Guest: memory}
-
-	object.Template.Spec.Domain.Resources.Requests = resourceRequests
 }
 
 func (r *Builder) getCpuCount(vm *model.Workload, imageCpuProperty string) (count uint32) {

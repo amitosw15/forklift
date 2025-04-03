@@ -24,6 +24,7 @@ import (
 	liberr "github.com/konveyor/forklift-controller/pkg/lib/error"
 	core "k8s.io/api/core/v1"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
+	cnv "kubevirt.io/api/core/v1"
 )
 
 // PlanSpec defines the desired state of Plan.
@@ -48,6 +49,51 @@ type PlanSpec struct {
 	PreserveClusterCPUModel bool `json:"preserveClusterCpuModel,omitempty"`
 	// Preserve static IPs of VMs in vSphere
 	PreserveStaticIPs bool `json:"preserveStaticIPs,omitempty"`
+	// Specify the disk bus which will be applied to all VMs disks in plan.
+	// Possible options 'scsi', 'sata' and 'virtio'.
+	// Defaults to 'virtio'.
+	// +optional
+	DiskBus cnv.DiskBus `json:"diskBus,omitempty"`
+	// PVCNameTemplate is a template for generating PVC names for VM disks.
+	// It follows Go template syntax and has access to the following variables:
+	//   - .VmName: name of the VM
+	//   - .PlanName: name of the migration plan
+	//   - .DiskIndex: initial volume index of the disk
+	//   - .RootDiskIndex: index of the root disk
+	// Note:
+	//   This template can be overridden at the individual VM level.
+	// Examples:
+	//   "{{.VmName}}-disk-{{.DiskIndex}}"
+	//   "{{if eq .DiskIndex .RootDiskIndex}}root{{else}}data{{end}}-{{.DiskIndex}}"
+	// +optional
+	PVCNameTemplate string `json:"pvcNameTemplate,omitempty"`
+	// VolumeNameTemplate is a template for generating volume interface names in the target virtual machine.
+	// It follows Go template syntax and has access to the following variables:
+	//   - .PVCName: name of the PVC mounted to the VM using this volume
+	//   - .VolumeIndex: sequential index of the volume interface (0-based)
+	// Note:
+	//   - This template can be overridden at the individual VM level
+	//   - If not specified on VM level and on Plan leverl, default naming conventions will be used
+	// Examples:
+	//   "disk-{{.VolumeIndex}}"
+	//   "pvc-{{.PVCName}}"
+	// +optional
+	VolumeNameTemplate string `json:"volumeNameTemplate,omitempty"`
+	// NetworkNameTemplate is a template for generating network interface names in the target virtual machine.
+	// It follows Go template syntax and has access to the following variables:
+	//   - .NetworkName: If target network is multus, name of the Multus network attachment definition, empty otherwise.
+	//   - .NetworkNamespace: If target network is multus, namespace where the network attachment definition is located.
+	//   - .NetworkType: type of the network ("Multus" or "Pod")
+	//   - .NetworkIndex: sequential index of the network interface (0-based)
+	// The template can be used to customize network interface names based on target network configuration.
+	// Note:
+	//   - This template can be overridden at the individual VM level
+	//   - If not specified on VM level and on Plan leverl, default naming conventions will be used
+	// Examples:
+	//   "net-{{.NetworkIndex}}"
+	//   "{{if eq .NetworkType "Pod"}}pod{{else}}multus-{{.NetworkIndex}}{{end}}"
+	// +optional
+	NetworkNameTemplate string `json:"networkNameTemplate,omitempty"`
 }
 
 // Find a planned VM.
@@ -141,3 +187,29 @@ func (r *Plan) IsSourceProviderOCP() bool {
 }
 
 func (r *Plan) IsSourceProviderVSphere() bool { return r.Provider.Source.Type() == VSphere }
+
+// PVCNameTemplateData contains fields used in naming templates.
+type PVCNameTemplateData struct {
+	VmName        string `json:"vmName"`
+	PlanName      string `json:"planName"`
+	DiskIndex     int    `json:"diskIndex"`
+	RootDiskIndex int    `json:"rootDiskIndex"`
+}
+
+// VolumeNameTemplateData contains fields used in naming templates.
+type VolumeNameTemplateData struct {
+	PVCName     string `json:"pvcName,omitempty"`
+	VolumeIndex int    `json:"volumeIndex,omitempty"`
+}
+
+// NetworkNameTemplateData contains fields used in naming templates.
+type NetworkNameTemplateData struct {
+	// NetworkName is the name of the Multus network attachment definition if target network is multus, empty otherwise
+	NetworkName string `json:"networkName,omitempty"`
+	// NetworkNamespace is the namespace where the network attachment definition is located if target network is multus
+	NetworkNamespace string `json:"networkNamespace,omitempty"`
+	// NetworkType is the type of the network ("Multus" or "Pod")
+	NetworkType string `json:"networkType,omitempty"`
+	// NetworkIndex is the sequential index of the network interface (0-based)
+	NetworkIndex int `json:"networkIndex,omitempty"`
+}

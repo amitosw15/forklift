@@ -87,8 +87,9 @@ const (
 	fTag     = "tag"
 	fSummary = "summary"
 	// PortGroup
-	fDVSwitch = "config.distributedVirtualSwitch"
-	fKey      = "key"
+	fDVSwitch     = "config.distributedVirtualSwitch"
+	fDVSwitchVlan = "config.defaultPortConfig"
+	fKey          = "key"
 	// DV Switch
 	fDVSwitchHost = "config.host"
 	// Datastore
@@ -100,6 +101,7 @@ const (
 	fUUID                = "config.uuid"
 	fFirmware            = "config.firmware"
 	fFtInfo              = "config.ftInfo"
+	fBootOptions         = "config.bootOptions"
 	fCpuAffinity         = "config.cpuAffinity"
 	fCpuHotAddEnabled    = "config.cpuHotAddEnabled"
 	fCpuHotRemoveEnabled = "config.cpuHotRemoveEnabled"
@@ -688,6 +690,7 @@ func (r *Collector) propertySpec() []types.PropertySpec {
 			PathSet: []string{
 				fName,
 				fDVSwitch,
+				fDVSwitchVlan,
 				fTag,
 				fKey,
 			},
@@ -727,6 +730,7 @@ func (r *Collector) vmPathSet() []string {
 		fFirmware,
 		fFtInfo,
 		fCpuAffinity,
+		fBootOptions,
 		fCpuHotAddEnabled,
 		fCpuHotRemoveEnabled,
 		fMemoryHotAddEnabled,

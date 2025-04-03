@@ -1,6 +1,7 @@
 package vsphere
 
 import (
+	"fmt"
 	"net/url"
 	"sort"
 	"strconv"
@@ -306,6 +307,7 @@ func (v *HostAdapter) Apply(u types.ObjectUpdate) {
 								Key:    portGroup.Key,
 								Name:   portGroup.Spec.Name,
 								Switch: portGroup.Vswitch,
+								VlanId: portGroup.Spec.VlanId,
 							})
 					}
 				}
@@ -397,6 +399,21 @@ func (v *NetworkAdapter) Apply(u types.ObjectUpdate) {
 			case fSummary:
 				if s, cast := p.Val.(types.OpaqueNetworkSummary); cast {
 					v.model.Key = s.OpaqueNetworkId
+				}
+			case fDVSwitchVlan:
+				if portSettings, cast := p.Val.(types.VMwareDVSPortSetting); cast {
+					switch vlanIdSpec := portSettings.Vlan.(type) {
+					case *types.VmwareDistributedVirtualSwitchVlanIdSpec:
+						if int(vlanIdSpec.VlanId) > 0 {
+							v.model.VlanId = strconv.Itoa(int(vlanIdSpec.VlanId))
+						}
+					case *types.VmwareDistributedVirtualSwitchTrunkVlanSpec:
+						refList := []string{}
+						for _, val := range vlanIdSpec.VlanId {
+							refList = append(refList, fmt.Sprintf("%d-%d", val.Start, val.End))
+						}
+						v.model.VlanId = strings.Join(refList, ",")
+					}
 				}
 			}
 		}
@@ -548,6 +565,12 @@ func (v *VmAdapter) Apply(u types.ObjectUpdate) {
 				if a, cast := p.Val.(types.VirtualMachineAffinityInfo); cast {
 					v.model.CpuAffinity = a.AffinitySet
 				}
+			case fBootOptions:
+				if a, cast := p.Val.(types.VirtualMachineBootOptions); cast {
+					if a.EfiSecureBootEnabled != nil {
+						v.model.SecureBoot = *a.EfiSecureBootEnabled
+					}
+				}
 			case fCpuHotAddEnabled:
 				if b, cast := p.Val.(bool); cast {
 					v.model.CpuHotAddEnabled = b
@@ -662,10 +685,14 @@ func (v *VmAdapter) Apply(u types.ObjectUpdate) {
 					for _, ipa := range ipas.GuestStackInfo {
 						routes := ipa.IpRouteConfig.IpRoute
 						for _, route := range routes {
+							var dnsList []string
+							if ipa.DnsConfig != nil {
+								dnsList = ipa.DnsConfig.IpAddress
+							}
 							if len(route.Gateway.IpAddress) > 0 {
 								guestIpStackList = append(guestIpStackList, model.GuestIpStack{
 									Gateway: route.Gateway.IpAddress,
-									DNS:     ipa.DnsConfig.IpAddress,
+									DNS:     dnsList,
 								})
 							}
 						}

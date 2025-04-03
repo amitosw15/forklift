@@ -70,6 +70,13 @@ func (r Reconciler) CreateOVAServerDeployment(provider *api.Provider, ctx contex
 
 func (r *Reconciler) createPvForNfs(provider *api.Provider, ctx context.Context, pvNamePrefix string) (pv *core.PersistentVolume, err error) {
 	splitted := strings.Split(provider.Spec.URL, ":")
+	if len(splitted) < 2 {
+		err = fmt.Errorf("invalid provider URL format: %s", provider.Spec.URL)
+
+		err = liberr.Wrap(err)
+		r.Log.Error(err, "Failed to parse NFS server and path from provider URL")
+		return nil, err
+	}
 	nfsServer := splitted[0]
 	nfsPath := splitted[1]
 	labels := map[string]string{"provider": provider.Name, "app": "forklift", "subapp": ovaServer}
@@ -222,6 +229,16 @@ func (r *Reconciler) makeOvaProviderPodSpec(pvcName, providerName, providerNames
 			{
 				Name:      nfsVolumeName,
 				MountPath: mountPath,
+			},
+		},
+		Resources: core.ResourceRequirements{
+			Requests: core.ResourceList{
+				core.ResourceCPU:    resource.MustParse(Settings.OvaContainerRequestsCpu),
+				core.ResourceMemory: resource.MustParse(Settings.OvaContainerRequestsMemory),
+			},
+			Limits: core.ResourceList{
+				core.ResourceCPU:    resource.MustParse(Settings.OvaContainerLimitsCpu),
+				core.ResourceMemory: resource.MustParse(Settings.OvaContainerRequestsMemory),
 			},
 		},
 		SecurityContext: securityContext,

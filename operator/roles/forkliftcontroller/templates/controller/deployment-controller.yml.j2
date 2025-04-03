@@ -81,6 +81,14 @@ spec:
         - name: CLEANUP_RETRIES
           value: "{{ controller_cleanup_retries }}"
 {% endif %}
+{% if controller_dv_status_check_retries is number %}
+        - name: DV_STATUS_CHECK_RETRIES
+          value: "{{ controller_dv_status_check_retries }}"
+{% endif %}
+{% if controller_snapshot_removal_check_retries is number %}
+        - name: SNAPSHOT_REMOVAL_CHECK_RETRIES
+          value: "{{ controller_snapshot_removal_check_retries }}"
+{% endif %}
 {% if controller_max_vm_inflight is number %}
         - name: MAX_VM_INFLIGHT
           value: "{{ controller_max_vm_inflight }}"
@@ -101,6 +109,10 @@ spec:
 {% endif %}
 {% if controller_ovirt_warm_migration|bool %}
         - name: FEATURE_OVIRT_WARM_MIGRATION
+          value: "true"
+{% endif %}
+{% if controller_retain_precopy_importer_pods|bool %}
+        - name: FEATURE_RETAIN_PRECOPY_IMPORTER_PODS
           value: "true"
 {% endif %}
 {% if ovirt_osmap_configmap_name is defined %}
@@ -131,6 +143,30 @@ spec:
           value: "{{ virt_v2v_extra_args }}"
         - name: VIRT_V2V_EXTRA_CONF_CONFIG_MAP
           value: "{{ virt_v2v_extra_conf_config_map }}"
+        - name: VIRT_V2V_CONTAINER_LIMITS_CPU
+          value: "{{ virt_v2v_container_limits_cpu }}"
+        - name: VIRT_V2V_CONTAINER_LIMITS_MEMORY
+          value: "{{ virt_v2v_container_limits_memory }}"
+        - name: VIRT_V2V_CONTAINER_REQUESTS_CPU
+          value: "{{ virt_v2v_container_requests_cpu }}"
+        - name: VIRT_V2V_CONTAINER_REQUESTS_MEMORY
+          value: "{{ virt_v2v_container_requests_memory }}"
+        - name: HOOKS_CONTAINER_LIMITS_CPU
+          value: "{{ hooks_container_limits_cpu }}"
+        - name: HOOKS_CONTAINER_LIMITS_MEMORY
+          value: "{{ hooks_container_limits_memory }}"
+        - name: HOOKS_CONTAINER_REQUESTS_CPU
+          value: "{{ hooks_container_requests_cpu }}"
+        - name: HOOKS_CONTAINER_REQUESTS_MEMORY
+          value: "{{ hooks_container_requests_memory }}"
+        - name: OVA_CONTAINER_LIMITS_CPU
+          value: "{{ ova_container_limits_cpu }}"
+        - name: OVA_CONTAINER_LIMITS_MEMORY
+          value: "{{ ova_container_limits_memory }}"
+        - name: OVA_CONTAINER_REQUESTS_CPU
+          value: "{{ ova_container_requests_cpu }}"
+        - name: OVA_CONTAINER_REQUESTS_MEMORY
+          value: "{{ ova_container_requests_memory }}"
         envFrom:
         - configMapRef:
             name: {{ controller_configmap_name }}

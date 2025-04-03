@@ -6,6 +6,7 @@ app_namespace: "{{ lookup( 'env', 'WATCH_NAMESPACE') or 'konveyor-forklift' }}"
 feature_ui_plugin: true
 feature_validation: true
 feature_volume_populator: true
+feature_copy_offload: false
 
 k8s_cluster: false
 feature_auth_required: true
@@ -34,8 +35,11 @@ controller_precopy_interval: 60
 controller_snapshot_removal_timeout_minuts: 120
 controller_snapshot_status_check_rate_seconds: 10
 controller_cleanup_retries: 10
+controller_dv_status_check_retries: 10
+controller_snapshot_removal_check_retries: 20
 controller_vsphere_incremental_backup: true
 controller_ovirt_warm_migration: true
+controller_retain_precopy_importer_pods: false
 controller_max_vm_inflight: 20
 controller_filesystem_overhead: 10
 controller_block_overhead: 0
@@ -108,12 +112,26 @@ populator_controller_container_name: "{{ app_name }}-populator-controller"
 populator_openstack_image_fqin: "{{ lookup( 'env', 'OPENSTACK_POPULATOR_IMAGE') or lookup( 'env', 'RELATED_IMAGE_OPENSTACK_POPULATOR') }}"
 
 must_gather_image_fqin: "{{ lookup( 'env', 'MUST_GATHER_IMAGE') or lookup( 'env', 'RELATED_IMAGE_MUST_GATHER') }}"
+
 virt_v2v_image_fqin: "{{ lookup( 'env', 'VIRT_V2V_IMAGE') or lookup( 'env', 'RELATED_IMAGE_VIRT_V2V') }}"
 virt_v2v_dont_request_kvm: "{{ lookup( 'env', 'VIRT_V2V_DONT_REQUEST_KVM') }}"
 virt_v2v_extra_args: "{{ lookup( 'env', 'VIRT_V2V_EXTRA_ARGS') }}"
 virt_v2v_extra_conf_config_map: "{{ lookup( 'env', 'VIRT_V2V_EXTRA_CONF_CONFIG_MAP') }}"
+virt_v2v_container_limits_cpu: "4000m"
+virt_v2v_container_limits_memory: "8Gi"
+virt_v2v_container_requests_cpu: "1000m"
+virt_v2v_container_requests_memory: "1Gi"
+
+hooks_container_limits_cpu: "1000m"
+hooks_container_limits_memory: "1Gi"
+hooks_container_requests_cpu: "100m"
+hooks_container_requests_memory: "150Mi"
 
 ova_provider_server_fqin: "{{ lookup( 'env', 'OVA_PROVIDER_SERVER_IMAGE') or lookup( 'env', 'RELATED_IMAGE_OVA_PROVIDER_SERVER') }}"
+ova_container_limits_cpu: "1000m"
+ova_container_limits_memory: "1Gi"
+ova_container_requests_cpu: "100m"
+ova_container_requests_memory: "150Mi"
 
 metric_service_name: "{{ app_name }}-metrics"
 metric_servicemonitor_name: "{{ app_name }}-metrics"

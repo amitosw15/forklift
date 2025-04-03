@@ -39,6 +39,46 @@ type VM struct {
 	// Selected InstanceType that will override the VM properties.
 	// +optional
 	InstanceType string `json:"instanceType,omitempty"`
+	// PVCNameTemplate is a template for generating PVC names for VM disks.
+	// It follows Go template syntax and has access to the following variables:
+	//   - .VmName: name of the VM
+	//   - .PlanName: name of the migration plan
+	//   - .DiskIndex: initial volume index of the disk
+	//   - .RootDiskIndex: index of the root disk
+	// Note:
+	//   This template overrides the plan level template.
+	// Examples:
+	//   "{{.VmName}}-disk-{{.DiskIndex}}"
+	//   "{{if eq .DiskIndex .RootDiskIndex}}root{{else}}data{{end}}-{{.DiskIndex}}"
+	// +optional
+	PVCNameTemplate string `json:"pvcNameTemplate,omitempty"`
+	// VolumeNameTemplate is a template for generating volume interface names in the target virtual machine.
+	// It follows Go template syntax and has access to the following variables:
+	//   - .PVCName: name of the PVC mounted to the VM using this volume
+	//   - .VolumeIndex: sequential index of the volume interface (0-based)
+	// Note:
+	//   - This template will override at the plan level template
+	//   - If not specified on VM level and on Plan leverl, default naming conventions will be used
+	// Examples:
+	//   "disk-{{.VolumeIndex}}"
+	//   "pvc-{{.PVCName}}"
+	// +optional
+	VolumeNameTemplate string `json:"volumeNameTemplate,omitempty"`
+	// NetworkNameTemplate is a template for generating network interface names in the target virtual machine.
+	// It follows Go template syntax and has access to the following variables:
+	//   - .NetworkName: If target network is multus, name of the Multus network attachment definition, empty otherwise.
+	//   - .NetworkNamespace: If target network is multus, namespace where the network attachment definition is located.
+	//   - .NetworkType: type of the network ("Multus" or "Pod")
+	//   - .NetworkIndex: sequential index of the network interface (0-based)
+	// The template can be used to customize network interface names based on target network configuration.
+	// Note:
+	//   - This template will override at the plan level template
+	//   - If not specified on VM level and on Plan leverl, default naming conventions will be used
+	// Examples:
+	//   "net-{{.NetworkIndex}}"
+	//   "{{if eq .NetworkType "Pod"}}pod{{else}}multus-{{.NetworkIndex}}{{end}}"
+	// +optional
+	NetworkNameTemplate string `json:"networkNameTemplate,omitempty"`
 }
 
 // Find a Hook for the specified step.
@@ -98,10 +138,12 @@ const (
 
 // Precopy durations
 type Precopy struct {
-	Start    *meta.Time  `json:"start,omitempty"`
-	End      *meta.Time  `json:"end,omitempty"`
-	Snapshot string      `json:"snapshot,omitempty"`
-	Deltas   []DiskDelta `json:"deltas,omitempty"`
+	Start        *meta.Time  `json:"start,omitempty"`
+	End          *meta.Time  `json:"end,omitempty"`
+	Snapshot     string      `json:"snapshot,omitempty"`
+	CreateTaskId string      `json:"createTaskId,omitempty"`
+	RemoveTaskId string      `json:"removeTaskId,omitempty"`
+	Deltas       []DiskDelta `json:"deltas,omitempty"`
 }
 
 func (r *Precopy) WithDeltas(deltas map[string]string) {

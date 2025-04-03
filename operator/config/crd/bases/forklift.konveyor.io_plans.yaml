@@ -60,6 +60,12 @@ spec:
               description:
                 description: Description
                 type: string
+              diskBus:
+                description: |-
+                  Specify the disk bus which will be applied to all VMs disks in plan.
+                  Possible options 'scsi', 'sata' and 'virtio'.
+                  Defaults to 'virtio'.
+                type: string
               map:
                 description: Resource mapping.
                 properties:
@@ -155,6 +161,22 @@ spec:
                 - network
                 - storage
                 type: object
+              networkNameTemplate:
+                description: |-
+                  NetworkNameTemplate is a template for generating network interface names in the target virtual machine.
+                  It follows Go template syntax and has access to the following variables:
+                    - .NetworkName: If target network is multus, name of the Multus network attachment definition, empty otherwise.
+                    - .NetworkNamespace: If target network is multus, namespace where the network attachment definition is located.
+                    - .NetworkType: type of the network ("Multus" or "Pod")
+                    - .NetworkIndex: sequential index of the network interface (0-based)
+                  The template can be used to customize network interface names based on target network configuration.
+                  Note:
+                    - This template can be overridden at the individual VM level
+                    - If not specified on VM level and on Plan leverl, default naming conventions will be used
+                  Examples:
+                    "net-{{.NetworkIndex}}"
+                    "{{if eq .NetworkType "Pod"}}pod{{else}}multus-{{.NetworkIndex}}{{end}}"
+                type: string
               preserveClusterCpuModel:
                 description: Preserve the CPU model and flags the VM runs with in
                   its oVirt cluster.
@@ -257,6 +279,20 @@ spec:
                 - destination
                 - source
                 type: object
+              pvcNameTemplate:
+                description: |-
+                  PVCNameTemplate is a template for generating PVC names for VM disks.
+                  It follows Go template syntax and has access to the following variables:
+                    - .VmName: name of the VM
+                    - .PlanName: name of the migration plan
+                    - .DiskIndex: initial volume index of the disk
+                    - .RootDiskIndex: index of the root disk
+                  Note:
+                    This template can be overridden at the individual VM level.
+                  Examples:
+                    "{{.VmName}}-disk-{{.DiskIndex}}"
+                    "{{if eq .DiskIndex .RootDiskIndex}}root{{else}}data{{end}}-{{.DiskIndex}}"
+                type: string
               targetNamespace:
                 description: Target namespace.
                 type: string
@@ -432,14 +468,70 @@ spec:
                         The VM Namespace
                         Only relevant for an openshift source.
                       type: string
+                    networkNameTemplate:
+                      description: |-
+                        NetworkNameTemplate is a template for generating network interface names in the target virtual machine.
+                        It follows Go template syntax and has access to the following variables:
+                          - .NetworkName: If target network is multus, name of the Multus network attachment definition, empty otherwise.
+                          - .NetworkNamespace: If target network is multus, namespace where the network attachment definition is located.
+                          - .NetworkType: type of the network ("Multus" or "Pod")
+                          - .NetworkIndex: sequential index of the network interface (0-based)
+                        The template can be used to customize network interface names based on target network configuration.
+                        Note:
+                          - This template will override at the plan level template
+                          - If not specified on VM level and on Plan leverl, default naming conventions will be used
+                        Examples:
+                          "net-{{.NetworkIndex}}"
+                          "{{if eq .NetworkType "Pod"}}pod{{else}}multus-{{.NetworkIndex}}{{end}}"
+                      type: string
+                    pvcNameTemplate:
+                      description: |-
+                        PVCNameTemplate is a template for generating PVC names for VM disks.
+                        It follows Go template syntax and has access to the following variables:
+                          - .VmName: name of the VM
+                          - .PlanName: name of the migration plan
+                          - .DiskIndex: initial volume index of the disk
+                          - .RootDiskIndex: index of the root disk
+                        Note:
+                          This template overrides the plan level template.
+                        Examples:
+                          "{{.VmName}}-disk-{{.DiskIndex}}"
+                          "{{if eq .DiskIndex .RootDiskIndex}}root{{else}}data{{end}}-{{.DiskIndex}}"
+                      type: string
                     rootDisk:
                       description: Choose the primary disk the VM boots from
                       type: string
                     type:
                       description: Type used to qualify the name.
                       type: string
+                    volumeNameTemplate:
+                      description: |-
+                        VolumeNameTemplate is a template for generating volume interface names in the target virtual machine.
+                        It follows Go template syntax and has access to the following variables:
+                          - .PVCName: name of the PVC mounted to the VM using this volume
+                          - .VolumeIndex: sequential index of the volume interface (0-based)
+                        Note:
+                          - This template will override at the plan level template
+                          - If not specified on VM level and on Plan leverl, default naming conventions will be used
+                        Examples:
+                          "disk-{{.VolumeIndex}}"
+                          "pvc-{{.PVCName}}"
+                      type: string
                   type: object
                 type: array
+              volumeNameTemplate:
+                description: |-
+                  VolumeNameTemplate is a template for generating volume interface names in the target virtual machine.
+                  It follows Go template syntax and has access to the following variables:
+                    - .PVCName: name of the PVC mounted to the VM using this volume
+                    - .VolumeIndex: sequential index of the volume interface (0-based)
+                  Note:
+                    - This template can be overridden at the individual VM level
+                    - If not specified on VM level and on Plan leverl, default naming conventions will be used
+                  Examples:
+                    "disk-{{.VolumeIndex}}"
+                    "pvc-{{.PVCName}}"
+                type: string
               warm:
                 description: Whether this is a warm migration.
                 type: boolean
@@ -888,6 +980,22 @@ spec:
                             The VM Namespace
                             Only relevant for an openshift source.
                           type: string
+                        networkNameTemplate:
+                          description: |-
+                            NetworkNameTemplate is a template for generating network interface names in the target virtual machine.
+                            It follows Go template syntax and has access to the following variables:
+                              - .NetworkName: If target network is multus, name of the Multus network attachment definition, empty otherwise.
+                              - .NetworkNamespace: If target network is multus, namespace where the network attachment definition is located.
+                              - .NetworkType: type of the network ("Multus" or "Pod")
+                              - .NetworkIndex: sequential index of the network interface (0-based)
+                            The template can be used to customize network interface names based on target network configuration.
+                            Note:
+                              - This template will override at the plan level template
+                              - If not specified on VM level and on Plan leverl, default naming conventions will be used
+                            Examples:
+                              "net-{{.NetworkIndex}}"
+                              "{{if eq .NetworkType "Pod"}}pod{{else}}multus-{{.NetworkIndex}}{{end}}"
+                          type: string
                         newName:
                           description: The new name of the VM after matching DNS1123
                             requirements.
@@ -1024,6 +1132,20 @@ spec:
                             - progress
                             type: object
                           type: array
+                        pvcNameTemplate:
+                          description: |-
+                            PVCNameTemplate is a template for generating PVC names for VM disks.
+                            It follows Go template syntax and has access to the following variables:
+                              - .VmName: name of the VM
+                              - .PlanName: name of the migration plan
+                              - .DiskIndex: initial volume index of the disk
+                              - .RootDiskIndex: index of the root disk
+                            Note:
+                              This template overrides the plan level template.
+                            Examples:
+                              "{{.VmName}}-disk-{{.DiskIndex}}"
+                              "{{if eq .DiskIndex .RootDiskIndex}}root{{else}}data{{end}}-{{.DiskIndex}}"
+                          type: string
                         restorePowerState:
                           description: Source VM power state before migration.
                           type: string
@@ -1036,6 +1158,19 @@ spec:
                           type: string
                         type:
                           description: Type used to qualify the name.
+                          type: string
+                        volumeNameTemplate:
+                          description: |-
+                            VolumeNameTemplate is a template for generating volume interface names in the target virtual machine.
+                            It follows Go template syntax and has access to the following variables:
+                              - .PVCName: name of the PVC mounted to the VM using this volume
+                              - .VolumeIndex: sequential index of the volume interface (0-based)
+                            Note:
+                              - This template will override at the plan level template
+                              - If not specified on VM level and on Plan leverl, default naming conventions will be used
+                            Examples:
+                              "disk-{{.VolumeIndex}}"
+                              "pvc-{{.PVCName}}"
                           type: string
                         warm:
                           description: Warm migration status
@@ -1051,6 +1186,8 @@ spec:
                               items:
                                 description: Precopy durations
                                 properties:
+                                  createTaskId:
+                                    type: string
                                   deltas:
                                     items:
                                       properties:
@@ -1065,6 +1202,8 @@ spec:
                                     type: array
                                   end:
                                     format: date-time
+                                    type: string
+                                  removeTaskId:
                                     type: string
                                   snapshot:
                                     type: string
