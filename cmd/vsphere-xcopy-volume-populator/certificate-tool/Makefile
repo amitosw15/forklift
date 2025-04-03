@@ -4,8 +4,8 @@
 SHELL = /usr/bin/env bash -o pipefail
 .SHELLFLAGS = -ec
 
-CONFIG_FILE ?= config.yaml
-ENV_FILE ?= .env
+CONFIG_FILE ?= read-config-files/static_values.yaml
+ENV_FILE ?= read-config-files/dynamic_values.yaml
 
 SHELL := /usr/bin/env bash
 
