@@ -3,8 +3,8 @@ module github.com/kubev2v/forklift/cmd/vsphere-xcopy-volume-populator
 go 1.23.0
 
 require (
-	github.com/golang/mock v1.1.1
 	github.com/netapp/trident v0.0.0-20241205202115-c2d23723d93e
+	github.com/spf13/cobra v1.8.1
 	github.com/stretchr/testify v1.10.0
 	github.com/vmware/govmomi v0.48.0
 	go.uber.org/mock v0.5.0
@@ -13,6 +13,7 @@ require (
 )
 
 require (
+	github.com/inconshreveable/mousetrap v1.1.0 // indirect
 	github.com/klauspost/compress v1.18.0 // indirect
 	github.com/pmezard/go-difflib v1.0.1-0.20181226105442-5d4384ee4fb2 // indirect
 	golang.org/x/crypto v0.28.0 // indirect
@@ -89,7 +90,7 @@ require (
 	golang.org/x/oauth2 v0.23.0 // indirect
 	golang.org/x/sync v0.10.0 // indirect
 	golang.org/x/sys v0.26.0 // indirect
-	golang.org/x/term v0.25.0 // indirect
+	golang.org/x/term v0.25.0
 	golang.org/x/text v0.21.0 // indirect
 	golang.org/x/time v0.7.0 // indirect
 	golang.org/x/tools v0.24.0 // indirect
@@ -100,7 +101,7 @@ require (
 	gopkg.in/yaml.v2 v2.4.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 	howett.net/plist v0.0.0-20181124034731-591f970eefbb // indirect
-	k8s.io/api v0.31.1 // indirect
+	k8s.io/api v0.31.1
 	k8s.io/client-go v0.31.1
 	k8s.io/kube-openapi v0.0.0-20240228011516-70dd3763d340 // indirect
 	k8s.io/mount-utils v0.31.1 // indirect
