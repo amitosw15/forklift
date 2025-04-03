@@ -1,4 +1,3 @@
-// cmd/create_env.go
 package cmd
 
 import (
@@ -20,8 +19,8 @@ var (
 	podNamespace       string
 )
 
-var createEnvCmd = &cobra.Command{
-	Use:   "create-env",
+var createPopEnvCmd = &cobra.Command{
+	Use:   "create-populator-env",
 	Short: "Creates the environment (K8s cluster, CSI driver, etc.)",
 	Run: func(cmd *cobra.Command, args []string) {
 		fmt.Println("Creating environment...")
@@ -86,14 +85,14 @@ var createEnvCmd = &cobra.Command{
 }
 
 func init() {
-	rootCmd.AddCommand(createEnvCmd)
+	rootCmd.AddCommand(createPopEnvCmd)
 
-	createEnvCmd.Flags().StringVar(&kubeconfigPath, "kubeconfig", "/home/amit/.kube/config", "Path to the kubeconfig file")
-	createEnvCmd.Flags().StringVar(&testNamespace, "test-namespace", "vsphere-populator-test", "Namespace for testing")
-	createEnvCmd.Flags().StringVar(&testImageLabel, "test-image-label", "0.38", "Test image label")
-	createEnvCmd.Flags().StringVar(&testLabels, "test-labels", "vsphere-populator", "Test labels")
-	createEnvCmd.Flags().StringVar(&testPopulatorImage, "test-populator-image", "quay.io/amitos/vsphere-xcopy-volume-populator", "Test populator image")
-	createEnvCmd.Flags().StringVar(&podNamespace, "pod-namespace", "pop", "Pod namespace")
+	createPopEnvCmd.Flags().StringVar(&kubeconfigPath, "kubeconfig", "", "Path to the kubeconfig file")
+	createPopEnvCmd.Flags().StringVar(&testNamespace, "test-namespace", "vsphere-populator-test", "Namespace for testing")
+	createPopEnvCmd.Flags().StringVar(&testImageLabel, "test-image-label", "0.38", "Test image label")
+	createPopEnvCmd.Flags().StringVar(&testLabels, "test-labels", "vsphere-populator", "Test labels")
+	createPopEnvCmd.Flags().StringVar(&testPopulatorImage, "test-populator-image", "quay.io/amitos/vsphere-xcopy-volume-populator", "Test populator image")
+	createPopEnvCmd.Flags().StringVar(&podNamespace, "pod-namespace", "pop", "Pod namespace")
 }
 
 func ForkliftPopulatorClusterRole() *rbacv1.ClusterRole {

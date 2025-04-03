@@ -6,6 +6,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"os/exec"
 	"text/template"
 
 	appsv1 "k8s.io/api/apps/v1"
@@ -117,5 +118,45 @@ func CreateDeployment(clientset *kubernetes.Clientset, namespace string, deploy 
 		return fmt.Errorf("failed to create deployment: %w", err)
 	}
 	fmt.Println("Deployment created:", result.Name)
+	return nil
+}
+
+func ApplyYAMLFile(filePath string) error {
+	fmt.Printf("Applying YAML file: %s\n", filePath)
+	cmd := exec.Command("kubectl", "apply", "-f", filePath)
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+	return cmd.Run()
+}
+
+func EnsureRoleBinding(clientset *kubernetes.Clientset, binding *rbacv1.RoleBinding) error {
+	// Retrieve the RoleBinding in the specified namespace.
+	_, err := clientset.RbacV1().RoleBindings(binding.Namespace).Get(context.TODO(), binding.Name, metav1.GetOptions{})
+	if err != nil {
+		// Create the RoleBinding if it does not exist.
+		created, err := clientset.RbacV1().RoleBindings(binding.Namespace).Create(context.TODO(), binding, metav1.CreateOptions{})
+		if err != nil {
+			return fmt.Errorf("failed to create role binding %s: %w", binding.Name, err)
+		}
+		fmt.Printf("RoleBinding %q created.\n", created.Name)
+	} else {
+		fmt.Printf("RoleBinding %q already exists.\n", binding.Name)
+	}
+	return nil
+}
+
+func EnsureSecret(clientset *kubernetes.Clientset, secret *corev1.Secret) error {
+	// Attempt to get the Secret.
+	_, err := clientset.CoreV1().Secrets(secret.Namespace).Get(context.TODO(), secret.Name, metav1.GetOptions{})
+	if err != nil {
+		// Create the Secret if it does not exist.
+		created, err := clientset.CoreV1().Secrets(secret.Namespace).Create(context.TODO(), secret, metav1.CreateOptions{})
+		if err != nil {
+			return fmt.Errorf("failed to create secret %s: %w", secret.Name, err)
+		}
+		fmt.Printf("Secret %q created.\n", created.Name)
+	} else {
+		fmt.Printf("Secret %q already exists.\n", secret.Name)
+	}
 	return nil
 }

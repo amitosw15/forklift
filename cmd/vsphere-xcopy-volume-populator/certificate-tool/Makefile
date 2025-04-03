@@ -86,13 +86,16 @@ read-config: ## Read and display configuration from files.
 build: ## Build the certificate-tool CLI binary.
 	go build -o $(BINARY) .
 
-create-env: build ## Run certificate-tool create-env subcommand.
-	./$(BINARY) create-env --cluster-name=$(CLUSTER_NAME)
+create-populator-env: build ## Run certificate-tool create-env subcommand.
+	./$(BINARY) create-populator-env --cluster-name=$(CLUSTER_NAME)
+
+create-test-env: build ## Run certificate-tool create-env subcommand.
+	./$(BINARY) create-test-env --cluster-name=$(CLUSTER_NAME)
 
 create-vm: build ## Run certificate-tool create-vm subcommand.
 	./$(BINARY) create-vm --vm-name=$(VM_NAME)
 
-test-xcopy: build ## Run certificate-tool create-pvc subcommand.
+test-xcopy: build create-populator-env create-test-env ## Run certificate-tool create-pvc subcommand.
 	./$(BINARY) test-xcopy --pvc-name=$(PVC_NAME)
 
 
