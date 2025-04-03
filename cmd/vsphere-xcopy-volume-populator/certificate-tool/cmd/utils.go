@@ -12,6 +12,7 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/yaml"
 	"k8s.io/client-go/kubernetes"
@@ -111,13 +112,27 @@ func EnsureClusterRoleBinding(clientset *kubernetes.Clientset, binding *rbacv1.C
 	return nil
 }
 
-// CreateDeployment deploys an appsv1.Deployment in the specified namespace.
-func CreateDeployment(clientset *kubernetes.Clientset, namespace string, deploy *appsv1.Deployment) error {
-	result, err := clientset.AppsV1().Deployments(namespace).Create(context.TODO(), deploy, metav1.CreateOptions{})
+// EnsureDeployment ensures that an appsv1.Deployment exists in the specified namespace.
+// If the deployment doesn't exist, it creates it; otherwise, it prints that the deployment exists.
+func EnsureDeployment(clientset *kubernetes.Clientset, namespace string, deploy *appsv1.Deployment) error {
+	// Attempt to get the deployment by name.
+	existing, err := clientset.AppsV1().Deployments(namespace).Get(context.TODO(), deploy.Name, metav1.GetOptions{})
 	if err != nil {
-		return fmt.Errorf("failed to create deployment: %w", err)
+		if apierrors.IsNotFound(err) {
+			// Deployment does not exist, so create it.
+			created, err := clientset.AppsV1().Deployments(namespace).Create(context.TODO(), deploy, metav1.CreateOptions{})
+			if err != nil {
+				return fmt.Errorf("failed to create deployment %s: %w", deploy.Name, err)
+			}
+			fmt.Println("Deployment created:", created.Name)
+			return nil
+		}
+		// Other errors when retrieving the deployment.
+		return fmt.Errorf("failed to get deployment %s: %w", deploy.Name, err)
 	}
-	fmt.Println("Deployment created:", result.Name)
+
+	// Deployment already exists.
+	fmt.Println("Deployment already exists:", existing.Name)
 	return nil
 }
 

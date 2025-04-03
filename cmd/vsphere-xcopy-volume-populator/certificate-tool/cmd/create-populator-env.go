@@ -76,7 +76,7 @@ var createPopEnvCmd = &cobra.Command{
 		}
 
 		// Finally, create the deployment.
-		if err := CreateDeployment(clientset, testNamespace, deploy); err != nil {
+		if err := EnsureDeployment(clientset, testNamespace, deploy); err != nil {
 			panic(err)
 		}
 

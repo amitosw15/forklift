@@ -56,10 +56,7 @@ help: ## Display this help.
 		/^[a-zA-Z_0-9-]+:.*?##/ { printf "  \033[36m%-15s\033[0m %s\n", $$1, $$2 } \
 		/^##@/ { printf "\n\033[1m%s\033[0m\n", substr($$0, 5) } ' $(MAKEFILE_LIST)
 
-deploy-prerequisites: ## Deploy prerequisite resources.
-	@kubectl apply -f $(OPENSTACK_POPULATOR)
-	@kubectl apply -f $(OVIRT_POPULATOR)
-	@kubectl apply -f $(VSPHERE_POPULATOR)
+
 
 read-config: ## Read and display configuration from files.
 	@if [ ! -f "$(CONFIG_FILE)" ] || [ ! -s "$(CONFIG_FILE)" ]; then \
@@ -86,6 +83,9 @@ build: ## Build the certificate-tool CLI binary.
 	go build -o $(BINARY) .
 
 create-populator-env: build ## Run certificate-tool create-env subcommand.
+	@kubectl apply -f $(OPENSTACK_POPULATOR)
+	@kubectl apply -f $(OVIRT_POPULATOR)
+	@kubectl apply -f $(VSPHERE_POPULATOR)
 	./$(BINARY) create-populator-env \
 				--kubeconfig $(KUBECONFIG_PATH) \
 				--test-namespace $(TEST_NAMESPACE) \
