@@ -95,7 +95,10 @@ create-populator-env: build ## Run certificate-tool create-env subcommand.
 				--pod-namespace $(POD_NAMESPACE)
 
 create-test-env: build ## Run certificate-tool create-env subcommand.
-	./$(BINARY) create-test-env
+	./$(BINARY) create-test-env \
+		--kubeconfig $(KUBECONFIG) \
+		--storagePassword $(STORAGE_PASSWORD) \
+		--vspherePassword $(VSPHERE_PASSWORD)
 
 create-vm: build ## Run certificate-tool create-vm subcommand.
 	./$(BINARY) create-vm --vm-name=$(VM_NAME)
