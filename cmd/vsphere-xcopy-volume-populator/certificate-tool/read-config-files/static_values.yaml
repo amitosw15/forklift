@@ -1,4 +1,4 @@
-target-namespace: default
-storage-vendor: ontap
+target-namespace: pop
+storage-vendor: primera3par
 secret-name: populator-secret
-kubeconfig: "/somepath"
+kubeconfig: "/home/amit/.kube/config"

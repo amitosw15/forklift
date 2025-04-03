@@ -31,9 +31,9 @@ override USERNAME     ?= $(shell ( yq e '.username // ""' $(ENV_FILE) 2>/dev/nul
 # -----------------------------------------------------------------------------
 # Populator Files (for prerequisites)
 # -----------------------------------------------------------------------------
-OPENSTACK_POPULATOR ?= forklift.konveyor.io_openstackvolumepopulators.yaml
-OVIRT_POPULATOR     ?= forklift.konveyor.io_ovirtvolumepopulators.yaml
-VSPHERE_POPULATOR   ?= forklift.konveyor.io_vspherexcopyvolumepopulators.yaml
+OPENSTACK_POPULATOR ?= xcopy-setup/forklift.konveyor.io_openstackvolumepopulators.yaml
+OVIRT_POPULATOR     ?= xcopy-setup/forklift.konveyor.io_ovirtvolumepopulators.yaml
+VSPHERE_POPULATOR   ?= xcopy-setup/forklift.konveyor.io_vspherexcopyvolumepopulators.yaml
 
 # -----------------------------------------------------------------------------
 # Additional Variables for Certificate-Tool CLI (defaults can be overridden)
@@ -60,7 +60,6 @@ deploy-prerequisites: ## Deploy prerequisite resources.
 	@kubectl apply -f $(OPENSTACK_POPULATOR)
 	@kubectl apply -f $(OVIRT_POPULATOR)
 	@kubectl apply -f $(VSPHERE_POPULATOR)
-	@kubectl apply -f $(STORAGE_SECRET)
 
 read-config: ## Read and display configuration from files.
 	@if [ ! -f "$(CONFIG_FILE)" ] || [ ! -s "$(CONFIG_FILE)" ]; then \
@@ -87,10 +86,16 @@ build: ## Build the certificate-tool CLI binary.
 	go build -o $(BINARY) .
 
 create-populator-env: build ## Run certificate-tool create-env subcommand.
-	./$(BINARY) create-populator-env --cluster-name=$(CLUSTER_NAME)
+	./$(BINARY) create-populator-env \
+				--kubeconfig $(KUBECONFIG_PATH) \
+				--test-namespace $(TEST_NAMESPACE) \
+				--test-image-label $(TEST_IMAGE_LABEL) \
+				--test-labels $(TEST_LABELS) \
+				--test-populator-image $(TEST_POPULATOR_IMAGE) \
+				--pod-namespace $(POD_NAMESPACE)
 
 create-test-env: build ## Run certificate-tool create-env subcommand.
-	./$(BINARY) create-test-env --cluster-name=$(CLUSTER_NAME)
+	./$(BINARY) create-test-env
 
 create-vm: build ## Run certificate-tool create-vm subcommand.
 	./$(BINARY) create-vm --vm-name=$(VM_NAME)

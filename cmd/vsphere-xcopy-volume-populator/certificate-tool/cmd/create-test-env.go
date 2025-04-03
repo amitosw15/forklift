@@ -64,8 +64,8 @@ var createTestEnvCmd = &cobra.Command{
 func init() {
 	rootCmd.AddCommand(createTestEnvCmd)
 	createPopEnvCmd.Flags().StringVar(&kubeconfigPath, "kubeconfig", "", "Path to the kubeconfig file")
-	createPopEnvCmd.Flags().StringVar(&storagePassword, "kubeconfig", "", "Path to the kubeconfig file")
-	createPopEnvCmd.Flags().StringVar(&vspherePassword, "kubeconfig", "", "Path to the kubeconfig file")
+	createPopEnvCmd.Flags().StringVar(&storagePassword, "storagePassword", "", "Path to the kubeconfig file")
+	createPopEnvCmd.Flags().StringVar(&vspherePassword, "vspherePassword", "", "Path to the kubeconfig file")
 }
 
 // PopulatorAccessRoleBinding creates a RoleBinding that binds the "populator-access" Role
