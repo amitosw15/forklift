@@ -1,4 +1,3 @@
-// cmd/create_test.go
 package cmd
 
 import (

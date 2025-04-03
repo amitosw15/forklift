@@ -1,4 +1,3 @@
-// pkg/k8sutils/k8sutils.go
 package cmd
 
 import (
