@@ -16,7 +16,9 @@ POD_NAMESPACE = $(shell yq e '.target-namespace' $(CONFIG_FILE))
 STORAGE_VENDOR   = $(shell yq e '.storage-vendor' $(CONFIG_FILE))
 SECRET_NAME      = $(shell yq e '.secret-name' $(CONFIG_FILE))
 KUBECONFIG       = $(shell yq e '.kubeconfig' $(CONFIG_FILE))
-
+TEST_IMAGE_LABEL = $(shell yq e '.test-image-label' $(CONFIG_FILE))
+TEST_LABELS      = $(shell yq e '.test-labels' $(CONFIG_FILE))
+TEST_POPULATOR_IMAGE = $(shell yq e '.test-ppopulator-image' $(CONFIG_FILE))
 # -----------------------------------------------------------------------------
 # Dynamic Variables from ENV (overridable)
 # -----------------------------------------------------------------------------
@@ -88,7 +90,7 @@ create-populator-env: build ## Run certificate-tool create-env subcommand.
 	@kubectl apply -f $(VSPHERE_POPULATOR)
 	./$(BINARY) create-populator-env \
 				--kubeconfig $(KUBECONFIG) \
-				--test-namespace $(TEST_NAMESPACE) \
+				--test-namespace $(POD_NAMESPACE) \
 				--test-image-label $(TEST_IMAGE_LABEL) \
 				--test-labels $(TEST_LABELS) \
 				--test-populator-image $(TEST_POPULATOR_IMAGE) \
