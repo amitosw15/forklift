@@ -87,7 +87,7 @@ create-populator-env: build ## Run certificate-tool create-env subcommand.
 	@kubectl apply -f $(OVIRT_POPULATOR)
 	@kubectl apply -f $(VSPHERE_POPULATOR)
 	./$(BINARY) create-populator-env \
-				--kubeconfig $(KUBECONFIG_PATH) \
+				--kubeconfig $(KUBECONFIG) \
 				--test-namespace $(TEST_NAMESPACE) \
 				--test-image-label $(TEST_IMAGE_LABEL) \
 				--test-labels $(TEST_LABELS) \
@@ -98,13 +98,19 @@ create-test-env: build ## Run certificate-tool create-env subcommand.
 	./$(BINARY) create-test-env \
 		--kubeconfig $(KUBECONFIG) \
 		--storagePassword $(STORAGE_PASSWORD) \
-		--vspherePassword $(VSPHERE_PASSWORD)
+		--vspherePassword $(VSPHERE_PASSWORD) \
+		--populatorNamespace $(POPULATOR_NAMESPACE)
 
 create-vm: build ## Run certificate-tool create-vm subcommand.
 	./$(BINARY) create-vm --vm-name=$(VM_NAME)
 
-test-xcopy: build create-populator-env create-test-env ## Run certificate-tool create-pvc subcommand.
-	./$(BINARY) test-xcopy --pvc-name=$(PVC_NAME)
+test-xcopy: build create-populator-env create-test-env
+	@echo "Running test-xcopy..."
+	./$(BINARY) test-xcopy \
+		--kubeconfig $(KUBECONFIG) \
+		--test-namespace $(TARGET_NAMESPACE) \
+		--pvc-yaml "storage-vendors/pvc-hpe-3par-block.yaml"\
+		--cr-yaml "xcopy-setup/cr-test-xcopy.yaml"
 
 
 
