@@ -12,7 +12,8 @@ SHELL := /usr/bin/env bash
 # -----------------------------------------------------------------------------
 # Static Variables from Config
 # -----------------------------------------------------------------------------
-POD_NAMESPACE = $(shell yq e '.target-namespace' $(CONFIG_FILE))
+TEST_NAMESPACE = $(shell yq e '.test-namespace' $(CONFIG_FILE))
+POD_NAMESPACE = $(shell yq e '.pod-namespace' $(CONFIG_FILE))
 STORAGE_VENDOR   = $(shell yq e '.storage-vendor' $(CONFIG_FILE))
 SECRET_NAME      = $(shell yq e '.secret-name' $(CONFIG_FILE))
 KUBECONFIG       = $(shell yq e '.kubeconfig' $(CONFIG_FILE))
