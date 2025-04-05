@@ -12,7 +12,7 @@ SHELL := /usr/bin/env bash
 # -----------------------------------------------------------------------------
 # Static Variables from Config
 # -----------------------------------------------------------------------------
-TARGET_NAMESPACE = $(shell yq e '.target-namespace' $(CONFIG_FILE))
+POD_NAMESPACE = $(shell yq e '.target-namespace' $(CONFIG_FILE))
 STORAGE_VENDOR   = $(shell yq e '.storage-vendor' $(CONFIG_FILE))
 SECRET_NAME      = $(shell yq e '.secret-name' $(CONFIG_FILE))
 KUBECONFIG       = $(shell yq e '.kubeconfig' $(CONFIG_FILE))
@@ -38,8 +38,8 @@ VSPHERE_POPULATOR   ?= xcopy-setup/forklift.konveyor.io_vspherexcopyvolumepopula
 # -----------------------------------------------------------------------------
 # Additional Variables for Certificate-Tool CLI (defaults can be overridden)
 # -----------------------------------------------------------------------------
-# Use TARGET_NAMESPACE as the default cluster name.
-CLUSTER_NAME ?= $(TARGET_NAMESPACE)
+# Use POD_NAMESPACE as the default cluster name.
+CLUSTER_NAME ?= $(POD_NAMESPACE)
 VM_NAME      ?= certificate-vm
 PVC_NAME     ?= $(TARGET_PVC)
 
@@ -66,7 +66,7 @@ read-config: ## Read and display configuration from files.
 		echo "Error: ENV_FILE does not exist or is empty"; exit 1; \
 	fi
 	@echo "Static file vars:"
-	@echo "  target_namespace = $(TARGET_NAMESPACE)"
+	@echo "  pod_namespace = $(POD_NAMESPACE)"
 	@echo "  storage_vendor   = $(STORAGE_VENDOR)"
 	@echo "  secret_name      = $(SECRET_NAME)"
 	@echo "  kubeconfig       = $(KUBECONFIG)"
@@ -108,7 +108,6 @@ test-xcopy: build create-populator-env create-test-env
 	@echo "Running test-xcopy..."
 	./$(BINARY) test-xcopy \
 		--kubeconfig $(KUBECONFIG) \
-		--test-namespace $(TARGET_NAMESPACE) \
 		--pvc-yaml "storage-vendors/pvc-hpe-3par-block.yaml"\
 		--cr-yaml "xcopy-setup/cr-test-xcopy.yaml"
 
