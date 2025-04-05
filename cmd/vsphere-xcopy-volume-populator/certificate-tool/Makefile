@@ -91,7 +91,7 @@ create-populator-env: build ## Run certificate-tool create-env subcommand.
 	@kubectl apply -f $(VSPHERE_POPULATOR)
 	./$(BINARY) create-populator-env \
 				--kubeconfig $(KUBECONFIG) \
-				--test-namespace $(POD_NAMESPACE) \
+				--test-namespace $(TEST_NAMESPACE) \
 				--test-image-label $(TEST_IMAGE_LABEL) \
 				--test-labels $(TEST_LABELS) \
 				--test-populator-image $(TEST_POPULATOR_IMAGE) \
