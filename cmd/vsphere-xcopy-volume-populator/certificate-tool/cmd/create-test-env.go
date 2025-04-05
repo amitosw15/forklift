@@ -11,9 +11,8 @@ import (
 )
 
 var (
-	storagePassword    string
-	vspherePassword    string
-	populatorNamespace string
+	storagePassword string
+	vspherePassword string
 )
 var createTestEnvCmd = &cobra.Command{
 	Use:   "create-test-env",
@@ -34,27 +33,27 @@ var createTestEnvCmd = &cobra.Command{
 
 		fmt.Println("Ensuring ns:", kubeconfigPath)
 		// Ensure required resources exist.
-		if err := EnsureNamespace(clientset, populatorNamespace); err != nil {
+		if err := EnsureNamespace(clientset, podNamespace); err != nil {
 			panic(err)
 		}
-		if err := EnsureServiceAccount(clientset, populatorNamespace, "forklift-populator-controller"); err != nil {
+		if err := EnsureServiceAccount(clientset, podNamespace, "forklift-populator-controller"); err != nil {
 			panic(err)
 		}
 
 		fmt.Println("Ensuring first role binding:", kubeconfigPath)
 		// Define the ClusterRoleBinding.
-		PopulatorAccessRB := PopulatorAccessRoleBinding(populatorNamespace)
+		PopulatorAccessRB := PopulatorAccessRoleBinding(podNamespace)
 		if err := EnsureRoleBinding(clientset, PopulatorAccessRB); err != nil {
 			panic(err)
 		}
 
 		fmt.Println("Ensuring second role binding:", kubeconfigPath)
-		PopulatorSecretReaderRB := PopulatorSecretReaderRoleBinding(populatorNamespace)
+		PopulatorSecretReaderRB := PopulatorSecretReaderRoleBinding(podNamespace)
 		if err := EnsureRoleBinding(clientset, PopulatorSecretReaderRB); err != nil {
 			panic(err)
 		}
 		fmt.Println("Ensuring secret:", kubeconfigPath)
-		Secret := PopulatorSecret(populatorNamespace, storagePassword, vspherePassword)
+		Secret := PopulatorSecret(podNamespace, storagePassword, vspherePassword)
 		if err := EnsureSecret(clientset, Secret); err != nil {
 			panic(err)
 		}
@@ -67,7 +66,7 @@ func init() {
 	createTestEnvCmd.Flags().StringVar(&kubeconfigPath, "kubeconfig", "", "Path to the kubeconfig file")
 	createTestEnvCmd.Flags().StringVar(&storagePassword, "storagePassword", "", "Path to the kubeconfig file")
 	createTestEnvCmd.Flags().StringVar(&vspherePassword, "vspherePassword", "", "Path to the kubeconfig file")
-	createTestEnvCmd.Flags().StringVar(&populatorNamespace, "populatorNamespace", "pop", "Path to the kubeconfig file")
+	createTestEnvCmd.Flags().StringVar(&podNamespace, "populatorNamespace", "pop", "Path to the kubeconfig file")
 }
 
 // PopulatorAccessRoleBinding creates a RoleBinding that binds the "populator-access" Role

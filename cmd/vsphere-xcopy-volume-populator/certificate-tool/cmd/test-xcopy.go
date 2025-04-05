@@ -34,7 +34,6 @@ var createTestCmd = &cobra.Command{
 func init() {
 	rootCmd.AddCommand(createTestCmd)
 	createTestCmd.Flags().StringVar(&testEnvKubeconfig, "kubeconfig", "", "Path to the kubeconfig file")
-	createTestCmd.Flags().StringVar(&populatorNamespace, "populatorNamespace", "pop", "Namespace for the test environment")
 	createTestCmd.Flags().StringVar(&pvcYamlPath, "pvcYamlpath", "pvc.yaml", "Path to the PVC YAML file")
 	createTestCmd.Flags().StringVar(&crYamlPath, "crYamlPath", "cr.yaml", "Path to the CR instance YAML file")
 }
