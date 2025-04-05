@@ -2,7 +2,7 @@ apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
   name: hpe-3par-block-pvc
-  namespace: default
+  namespace: pop
 spec:
   accessModes:
     - ReadWriteOnce  # RWO (Single-user access mode)
