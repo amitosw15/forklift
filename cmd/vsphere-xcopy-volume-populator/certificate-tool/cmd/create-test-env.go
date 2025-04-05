@@ -11,8 +11,9 @@ import (
 )
 
 var (
-	storagePassword string
-	vspherePassword string
+	storagePassword    string
+	vspherePassword    string
+	populatorNamespace string
 )
 var createTestEnvCmd = &cobra.Command{
 	Use:   "create-test-env",
@@ -33,27 +34,27 @@ var createTestEnvCmd = &cobra.Command{
 
 		fmt.Println("Ensuring ns:", kubeconfigPath)
 		// Ensure required resources exist.
-		if err := EnsureNamespace(clientset, testNamespace); err != nil {
+		if err := EnsureNamespace(clientset, populatorNamespace); err != nil {
 			panic(err)
 		}
-		if err := EnsureServiceAccount(clientset, testNamespace, "forklift-populator-controller"); err != nil {
+		if err := EnsureServiceAccount(clientset, populatorNamespace, "forklift-populator-controller"); err != nil {
 			panic(err)
 		}
 
 		fmt.Println("Ensuring first role binding:", kubeconfigPath)
 		// Define the ClusterRoleBinding.
-		PopulatorAccessRB := PopulatorAccessRoleBinding(testNamespace)
+		PopulatorAccessRB := PopulatorAccessRoleBinding(populatorNamespace)
 		if err := EnsureRoleBinding(clientset, PopulatorAccessRB); err != nil {
 			panic(err)
 		}
 
 		fmt.Println("Ensuring second role binding:", kubeconfigPath)
-		PopulatorSecretReaderRB := PopulatorSecretReaderRoleBinding(testNamespace)
+		PopulatorSecretReaderRB := PopulatorSecretReaderRoleBinding(populatorNamespace)
 		if err := EnsureRoleBinding(clientset, PopulatorSecretReaderRB); err != nil {
 			panic(err)
 		}
 		fmt.Println("Ensuring secret:", kubeconfigPath)
-		Secret := PopulatorSecret(testNamespace, storagePassword, vspherePassword)
+		Secret := PopulatorSecret(populatorNamespace, storagePassword, vspherePassword)
 		if err := EnsureSecret(clientset, Secret); err != nil {
 			panic(err)
 		}
@@ -66,6 +67,7 @@ func init() {
 	createTestEnvCmd.Flags().StringVar(&kubeconfigPath, "kubeconfig", "", "Path to the kubeconfig file")
 	createTestEnvCmd.Flags().StringVar(&storagePassword, "storagePassword", "", "Path to the kubeconfig file")
 	createTestEnvCmd.Flags().StringVar(&vspherePassword, "vspherePassword", "", "Path to the kubeconfig file")
+	createTestEnvCmd.Flags().StringVar(&populatorNamespace, "populatorNamespace", "pop", "Path to the kubeconfig file")
 }
 
 // PopulatorAccessRoleBinding creates a RoleBinding that binds the "populator-access" Role
@@ -124,14 +126,14 @@ func PopulatorSecret(namespace, storagePassword, vspherePassword string) *corev1
 		},
 		Type: corev1.SecretTypeOpaque,
 		StringData: map[string]string{
-			"POPULATOR_SECRET": "populator-secret",                           // decoded from cG9wdWxhdG9yLXNlY3JldA==
-			"STORAGE_HOSTNAME": "https://10.46.2.10:8080",                    // decoded from aHR0cHM6Ly8xMC40Ni4yLjEwOjgwODA=
-			"STORAGE_PASSWORD": storagePassword,                              // empty string
-			"STORAGE_USERNAME": "3paradm",                                    // decoded from M3BhcmFkbQ==
-			"VSPHERE_HOSTNAME": "eco-vcenter-server.lab.eng.tlv2.redhat.com", // decoded from ZWNvLXZjZW50ZXItc2VydmVyLmxhYi5lbmcudGx2Mi5yZWRoYXQuY29t
-			"VSPHERE_INSECURE": "true",                                       // decoded from dHJ1ZQ==
-			"VSPHERE_PASSWORD": vspherePassword,                              // empty string
-			"VSPHERE_USERNAME": "administrator@ecosystem.content.vsphere",    // decoded from YWRtaW5pc3RyYXRvckBlY29zeXN0ZW0uY29udGVudC52c3BoZXJl
+			"POPULATOR_SECRET": "populator-secret",
+			"STORAGE_HOSTNAME": "https://10.46.2.10:8080",
+			"STORAGE_PASSWORD": storagePassword,
+			"STORAGE_USERNAME": "3paradm",
+			"VSPHERE_HOSTNAME": "eco-vcenter-server.lab.eng.tlv2.redhat.com",
+			"VSPHERE_INSECURE": "true",
+			"VSPHERE_PASSWORD": vspherePassword,
+			"VSPHERE_USERNAME": "administrator@ecosystem.content.vsphere",
 		},
 	}
 }
