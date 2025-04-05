@@ -102,7 +102,7 @@ create-test-env: build ## Run certificate-tool create-env subcommand.
 		--kubeconfig $(KUBECONFIG) \
 		--storagePassword $(STORAGE_PASSWORD) \
 		--vspherePassword $(VSPHERE_PASSWORD) \
-		--populatorNamespace $(POPULATOR_NAMESPACE)
+		--populatorNamespace $(POD_NAMESPACE)
 
 create-vm: build ## Run certificate-tool create-vm subcommand.
 	./$(BINARY) create-vm --vm-name=$(VM_NAME)
