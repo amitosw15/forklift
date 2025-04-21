@@ -18,6 +18,7 @@ var (
 	testLabels         string
 	testPopulatorImage string
 	podNamespace       string
+	controllerPath     string
 )
 
 var createPopEnvCmd = &cobra.Command{
@@ -45,7 +46,7 @@ var createPopEnvCmd = &cobra.Command{
 			"TEST_POPULATOR_IMAGE": testPopulatorImage,
 			"POD_NAMESPACE":        podNamespace,
 		}
-		processedData, err := utils.ProcessTemplate("vsphere-populator.yaml", vars, "${", "}")
+		processedData, err := utils.ProcessTemplate(controllerPath, vars, "${", "}")
 		if err != nil {
 			panic(err)
 		}
@@ -60,7 +61,7 @@ var createPopEnvCmd = &cobra.Command{
 		if err := utils.EnsureNamespace(clientset, testNamespace); err != nil {
 			panic(err)
 		}
-		if err := utils.EnsureServiceAccount(clientset, testNamespace, "populator"); err != nil {
+		if err := utils.EnsureServiceAccount(clientset, testNamespace, "forklift-populator-controller"); err != nil {
 			panic(err)
 		}
 
@@ -94,8 +95,8 @@ func init() {
 	createPopEnvCmd.Flags().StringVar(&testLabels, "test-labels", "vsphere-populator", "Test labels")
 	createPopEnvCmd.Flags().StringVar(&testPopulatorImage, "test-populator-image", "quay.io/amitos/vsphere-xcopy-volume-populator", "Test populator image")
 	createPopEnvCmd.Flags().StringVar(&podNamespace, "pod-namespace", "pop", "Pod namespace")
+	createPopEnvCmd.Flags().StringVar(&controllerPath, "controller-path", "assets/manifests/xcopy-setup/controller.yaml", "controller yaml")
 }
-
 func ForkliftPopulatorClusterRole() *rbacv1.ClusterRole {
 	return &rbacv1.ClusterRole{
 		ObjectMeta: metav1.ObjectMeta{

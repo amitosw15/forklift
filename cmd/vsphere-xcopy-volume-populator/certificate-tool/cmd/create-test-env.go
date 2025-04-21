@@ -16,7 +16,7 @@ var (
 	vspherePassword string
 )
 var createTestEnvCmd = &cobra.Command{
-	Use:   "prepate",
+	Use:   "create-test-env",
 	Short: "Creates the environment (K8s cluster, CSI driver, etc.)",
 	Run: func(cmd *cobra.Command, args []string) {
 		fmt.Println("Creating environment...")
@@ -131,9 +131,12 @@ func PopulatorSecret(namespace, storagePassword, vspherePassword string) *corev1
 			"STORAGE_PASSWORD": storagePassword,
 			"STORAGE_USERNAME": "3paradm",
 			"VSPHERE_HOSTNAME": "eco-vcenter-server.lab.eng.tlv2.redhat.com",
+			"GOVMOMI_HOSTNAME": "eco-vcenter-server.lab.eng.tlv2.redhat.com",
 			"VSPHERE_INSECURE": "true",
 			"VSPHERE_PASSWORD": vspherePassword,
+			"GOVMOMI_PASSWORD": vspherePassword,
 			"VSPHERE_USERNAME": "administrator@ecosystem.content.vsphere",
+			"GOVMOMI_USERNAME": "administrator@ecosystem.content.vsphere",
 		},
 	}
 }

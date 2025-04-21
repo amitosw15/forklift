@@ -5,5 +5,7 @@ secret-name: populator-secret
 kubeconfig: "/home/amit/.kube/config"
 test-image-label:  0.38
 test-labels: vsphere-populator
-test-ppopulator-image: quay.io/amitos/vsphere-xcopy-volume-populator
-
+test-populator-image: quay.io/amitos/vsphere-xcopy-volume-populator
+storage-password: storage
+vsphere-password: vsphere
+controller-path: assets/manifests/xcopy-setup/controller.yaml

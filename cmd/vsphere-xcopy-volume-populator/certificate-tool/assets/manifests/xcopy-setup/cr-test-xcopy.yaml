@@ -4,7 +4,6 @@ metadata:
   name: test-xcopy
   namespace: pop
 spec:
-  secretRef: populator-secret
+  SecretName: populator-secret
   storageVendorProduct: primera3par
-  targetPVC: hpe-3par-block-pvc
   vmdkPath: "[eco-iscsi-ds1] ubuntu-automate-test2/ubuntu-20.04-server-cloudimg-amd64.vmdk"
