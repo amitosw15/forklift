@@ -1,11 +1,20 @@
+## test values
+### cluster config
 pod-namespace: pop
 test-namespace: vsphere-populator-test
-storage-vendor: primera3par
-secret-name: populator-secret
 kubeconfig: "/home/amit/.kube/config"
-test-image-label:  0.38
-test-labels: vsphere-populator
-test-populator-image: quay.io/amitos/vsphere-xcopy-volume-populator
-storage-password: storage
-vsphere-password: vsphere
+secret-name: populator-secret
 controller-path: assets/manifests/xcopy-setup/controller.yaml
+test-labels: vsphere-populator
+### images
+test-image-label:  0.47
+test-populator-image: quay.io/amitos/vsphere-xcopy-volume-populator
+### storage
+storage-vendor: primera3par
+storage-password: storage
+storage-user: 3paradm
+storage-url: https://10.46.2.10:8080
+### vsphere
+vsphere-password: vsphere
+vsphere-user: administrator@ecosystem.content.vsphere
+vsphere-url: eco-vcenter-server.lab.eng.tlv2.redhat.com
