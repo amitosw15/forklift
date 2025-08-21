@@ -96,6 +96,19 @@ func (c *VSphereClient) GetEsxByVm(ctx context.Context, vmId string) (*object.Ho
 			break
 		}
 	}
+	for _, dc := range datacenters {
+		finder.SetDatacenter(dc)
+		result, err := finder.VirtualMachine(ctx, "VirtualMachine:"+vmId)
+		if err != nil {
+			if _, ok := err.(*find.NotFoundError); !ok {
+				return nil, fmt.Errorf("error searching for VM in Datacenter '%s': %w", dc.Name(), err)
+			}
+		} else {
+			vm = result
+			fmt.Printf("found vm %v\n", vm)
+			break
+		}
+	}
 	if vm == nil {
 		moref := types.ManagedObjectReference{Type: "VirtualMachine", Value: vmId}
 		vm = object.NewVirtualMachine(c.Client.Client, moref)
