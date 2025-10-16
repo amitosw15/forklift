@@ -179,11 +179,7 @@ func (p *PowerstoreClonner) EnsureClonnerIgroup(initiatorGroup string, adapterId
 	return mappingContext, nil
 }
 
-<<<<<<< HEAD
-func getHostByInitiator(adapterIds []string, hosts *[]gopowerstore.Host, initiatorGroup string) (bool, populator.MappingContext, error) {
-=======
 func getHostByInitiator(adapterIds []string, hosts *[]gopowerstore.Host, initiatorGroup string ) (bool, populator.MappingContext, error) {
->>>>>>> 800224ecb (cr comments fixed)
 	for _, host := range *hosts {
 		for _, initiator := range host.Initiators {
 			for _, adapterId := range adapterIds {
@@ -210,11 +206,7 @@ func detectPortType(adapterId string) (gopowerstore.InitiatorProtocolTypeEnum, e
 	case strings.HasPrefix(adapterId, "nqn."):
 		return gopowerstore.InitiatorProtocolTypeEnumNVME, nil
 	default:
-<<<<<<< HEAD
 		return gopowerstore.InitiatorProtocolTypeEnumISCSI, fmt.Errorf("Could not determine port type for adapter ID: %s", adapterId)
-=======
-		return 0, fmt.Errorf("Could not determine port type for adapter ID: %s", adapterId)
->>>>>>> 800224ecb (cr comments fixed)
 	}
 }
 
