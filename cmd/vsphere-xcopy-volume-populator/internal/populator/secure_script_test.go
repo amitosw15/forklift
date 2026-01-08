@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"os"
-	"testing"
 
 	"github.com/google/uuid"
 	. "github.com/onsi/ginkgo/v2"
@@ -16,11 +15,6 @@ import (
 
 	vmware_mocks "github.com/kubev2v/forklift/cmd/vsphere-xcopy-volume-populator/internal/vmware/mocks"
 )
-
-func TestSecureScript(t *testing.T) {
-	RegisterFailHandler(Fail)
-	RunSpecs(t, "Secure Script Suite")
-}
 
 var _ = Describe("uploadScript", func() {
 	var (
