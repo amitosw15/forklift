@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/go-logr/logr"
 	"github.com/infinidat/infinibox-csi-driver/iboxapi"
@@ -103,21 +104,30 @@ func (c *InfiniboxClonner) EnsureClonnerIgroup(initiatorGroup string, adapterIds
 	for _, host := range hosts {
 		for _, port := range host.Ports {
 			for _, adapterId := range adapterIds {
+				matched := false
+				// For FC adapters, extract WWPN and compare using normalized comparison
 				if strings.HasPrefix(adapterId, "fc.") {
 					wwpn, err := fcutil.ExtractWWPN(adapterId)
+					klog.Infof("Extracted WWPN from adapter ID %s: %s", adapterId, wwpn)
 					if err != nil {
 						klog.Warningf("Failed to extract WWPN from adapter ID %s: %v", adapterId, err)
 						continue
 					}
+					// Compare normalized WWNs to handle different formatting
+					klog.Infof("Comparing normalized WWNs: %s with %s", wwpn, port.Address)
 					if fcutil.CompareWWNs(wwpn, port.Address) {
-						klog.Infof("Found host %s with adapter ID %s (port address: %s)", host.Name, adapterId, port.Address)
-						return createMappingContext(&host, initiatorGroup), nil
+						matched = true
 					}
 				} else {
+					// For iSCSI or other protocols, do direct comparison
 					if port.Address == adapterId {
-						klog.Infof("Found host %s with adapter ID %s (port address: %s)", host.Name, adapterId, port.Address)
-						return createMappingContext(&host, initiatorGroup), nil
+						matched = true
 					}
+				}
+
+				if matched {
+					klog.Infof("Found host %s with adapter ID %s (port address: %s)", host.Name, adapterId, port.Address)
+					return createMappingContext(&host, initiatorGroup), nil
 				}
 			}
 		}
@@ -205,14 +215,22 @@ func (c *InfiniboxClonner) CurrentMappedGroups(targetLUN populator.LUN, mappingC
 		return []string{}, nil
 	}
 
+	// Log all LUN mapping details for debugging
+	for i, lunInfo := range lunInfos {
+		klog.Infof("LUN mapping %d: HostID=%d, HostClusterID=%d, Clustered=%v, Lun=%d",
+			i+1, lunInfo.HostID, lunInfo.HostClusterID, lunInfo.CLustered, lunInfo.Lun)
+	}																																										
 	allHosts, err := c.api.GetAllHosts()
 	if err != nil {
 		return nil, fmt.Errorf("failed to get all hosts: %w", err)
 	}
 
+	klog.Infof("Retrieved %d hosts from InfiniBox", len(allHosts))
 	hostByID := make(map[int]*iboxapi.Host)
+	time.Sleep(10 * time.Second)
 	for i := range allHosts {
 		hostByID[allHosts[i].ID] = &allHosts[i]
+		klog.Infof("Host ID %d: %s", allHosts[i].ID, allHosts[i].Name)
 	}
 
 	mappedHosts := make([]string, 0, len(lunInfos))
@@ -231,7 +249,11 @@ func (c *InfiniboxClonner) CurrentMappedGroups(targetLUN populator.LUN, mappingC
 
 		host, exists := hostByID[lunInfo.HostID]
 		if !exists {
-			klog.Warningf("Failed to find host info for host ID %d", lunInfo.HostID)
+			klog.Warningf("Failed to find host info for host ID %d. Available host IDs: %v", lunInfo.HostID, getHostIDs(allHosts))
+			// Check if this might be a host cluster ID instead
+			if lunInfo.HostClusterID > 0 {
+				klog.Warningf("LUN mapping has HostClusterID=%d, but HostID=%d was not found. This might be a cluster mapping.", lunInfo.HostClusterID, lunInfo.HostID)
+			}
 			continue
 		}
 
@@ -253,4 +275,13 @@ func (c *InfiniboxClonner) CurrentMappedGroups(targetLUN populator.LUN, mappingC
 	}
 
 	return mappedHosts, nil
+}
+
+// getHostIDs returns a slice of all host IDs for debugging purposes
+func getHostIDs(hosts []iboxapi.Host) []int {
+	ids := make([]int, 0, len(hosts))
+	for _, host := range hosts {
+		ids = append(ids, host.ID)
+	}
+	return ids
 }
