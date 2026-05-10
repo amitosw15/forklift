@@ -189,6 +189,11 @@ func (p *Provider) RequiresConversion() bool {
 }
 
 // This provider support the vddk aio parameters.
+func (p *Provider) UseVIBMethod() bool {
+	esxiCloneMethod, methodSet := p.Spec.Settings[ESXiCloneMethod]
+	return !methodSet || esxiCloneMethod != ESXiCloneMethodSSH
+}
+
 func (p *Provider) UseVddkAioOptimization() bool {
 	useVddkAioOptimization := p.Spec.Settings[UseVddkAioOptimization]
 	if useVddkAioOptimization == "" {
