@@ -478,8 +478,7 @@ version() {
     if [ "${OUTPUT_FORMAT}" = "simple" ]; then
         echo "${SCRIPT_VERSION}"
     else
-        local json_result="{\"version\": \"${SCRIPT_VERSION}\"}"
-        xml_output "0" "${json_result}"
+        xml_output "0" "${SCRIPT_VERSION}"
     fi
 }
 

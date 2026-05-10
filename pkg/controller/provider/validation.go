@@ -47,6 +47,8 @@ const (
 	ConnectionInsecure      = "ConnectionInsecure"
 	SSHReady                = "SSHReady"
 	SSHNotReady             = "SSHNotReady"
+	VIBReady                = "VIBReady"
+	VIBNotReady             = "VIBNotReady"
 	SMBCSIDriverNotReady    = "SMBCSIDriverNotReady"
 	SMBMountFailed          = "SMBMountFailed"
 	WaitingForService       = "WaitingForService"

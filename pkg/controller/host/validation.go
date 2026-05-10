@@ -30,6 +30,8 @@ const (
 	ConnectionTestFailed    = "ConnectionTestFailed"
 	InMaintenance           = "InMaintenance"
 	NotHealthy              = "NotHealthy"
+	VIBInstalled            = "VIBInstalled"
+	VIBInstallFailed        = "VIBInstallFailed"
 )
 
 // Categories
@@ -70,6 +72,10 @@ func (r *Reconciler) validate(host *api.Host) error {
 		return liberr.Wrap(err)
 	}
 	err = r.validateIp(host)
+	if err != nil {
+		return liberr.Wrap(err)
+	}
+	err = r.checkAndAggregateVIB(host)
 	if err != nil {
 		return liberr.Wrap(err)
 	}

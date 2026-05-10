@@ -155,6 +155,18 @@ func (r Reconciler) Reconcile(ctx context.Context, request reconcile.Request) (r
 		return
 	}
 
+	// VIB installation (only when opted in and connection succeeded).
+	if !host.Status.HasBlockerCondition() && host.Status.HasCondition(ConnectionTestSucceeded) {
+		var vibRequeue time.Duration
+		vibRequeue, err = r.ensureVIB(host)
+		if err != nil {
+			return
+		}
+		if vibRequeue > 0 {
+			result.RequeueAfter = vibRequeue
+		}
+	}
+
 	// Ready condition.
 	if !host.Status.HasBlockerCondition() && host.Status.HasCondition(ConnectionTestSucceeded) {
 		host.Status.SetCondition(libcnd.Condition{
@@ -183,6 +195,11 @@ func (r Reconciler) Reconcile(ctx context.Context, request reconcile.Request) (r
 	// will not trigger DOS response.
 	if host.Status.HasCondition(ConnectionTestFailed) {
 		result.RequeueAfter = time.Minute * 15
+	}
+
+	// VIB install failed — retry sooner.
+	if host.Status.HasCondition(VIBInstallFailed) {
+		result.RequeueAfter = time.Minute * 5
 	}
 
 	// Done

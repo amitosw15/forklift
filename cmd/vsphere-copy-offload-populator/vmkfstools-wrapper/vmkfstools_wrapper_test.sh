@@ -121,7 +121,7 @@ test_version_command() {
     assert_exit_code 0 ${exit_code} "Version command exits with 0"
     assert_contains "0.3.0" "${output}" "Version output contains version number"
     assert_contains "<?xml version" "${output}" "Version output is XML format"
-    assert_contains '"version"' "${output}" "Version output contains version field"
+    assert_contains '"message"' "${output}" "Version output contains message field"
 }
 
 # Test: Version Command with --output simple
@@ -151,7 +151,7 @@ test_version_output_xml() {
     assert_exit_code 0 ${exit_code} "Version command with --output xml exits with 0"
     assert_contains "0.3.0" "${output}" "XML output contains version number"
     assert_contains "<?xml version" "${output}" "XML output has XML declaration"
-    assert_contains '"version"' "${output}" "XML output contains version field"
+    assert_contains '"message"' "${output}" "XML output contains message field"
 }
 
 # ============================================================================

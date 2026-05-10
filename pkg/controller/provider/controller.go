@@ -30,6 +30,7 @@ import (
 
 	api "github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1"
 	"github.com/kubev2v/forklift/pkg/controller/base"
+
 	"github.com/kubev2v/forklift/pkg/controller/provider/container"
 	"github.com/kubev2v/forklift/pkg/controller/provider/model"
 	"github.com/kubev2v/forklift/pkg/controller/provider/web"
