@@ -9,6 +9,7 @@ import (
 	"github.com/kubev2v/forklift/cmd/vsphere-copy-offload-populator/internal/fcutil"
 	"github.com/kubev2v/forklift/cmd/vsphere-copy-offload-populator/internal/logger"
 	"github.com/kubev2v/forklift/cmd/vsphere-copy-offload-populator/internal/populator"
+	"github.com/kubev2v/forklift/pkg/lib/client/vsphere/vmware"
 	drivers "github.com/netapp/trident/storage_drivers"
 	"github.com/netapp/trident/storage_drivers/ontap/api"
 	"k8s.io/klog/v2"
@@ -17,6 +18,7 @@ import (
 const OntapProviderID = "600a0980"
 
 // Ensure NetappClonner implements required interfaces
+var _ populator.RDMCapable = &NetappClonner{}
 var _ populator.VMDKCapable = &NetappClonner{}
 var _ populator.StorageArrayInfoProvider = &NetappClonner{}
 
@@ -250,4 +252,158 @@ func (c *NetappClonner) CurrentMappedGroups(targetLUN populator.LUN, _ populator
 
 	c.log.V(2).Info("found mapped groups", "lun", targetLUN.Name, "groups", lunMappedIgroups)
 	return lunMappedIgroups, nil
+}
+
+// RDMCopy performs a copy operation for RDM-backed disks using NetApp ONTAP APIs.
+// It resolves the RDM device to a source LUN, sets the target LUN's fstype attribute
+// to "raw" to prevent filesystem detection during import, then clones the LUN.
+func (c *NetappClonner) RDMCopy(vsphereClient vmware.Client, vmId string, sourceVMDKFile string, persistentVolume populator.PersistentVolume, progress chan<- uint64) error {
+	c.log.Info("RDM copy started", "vm", vmId, "source", sourceVMDKFile)
+
+	backing, err := vsphereClient.GetVMDiskBacking(context.Background(), vmId, sourceVMDKFile)
+	if err != nil {
+		return fmt.Errorf("failed to get RDM disk backing info: %w", err)
+	}
+
+	if !backing.IsRDM {
+		return fmt.Errorf("disk %s is not an RDM disk", sourceVMDKFile)
+	}
+
+	c.log.Info("found RDM device", "device", backing.DeviceName)
+
+	sourceLUN, err := c.resolveRDMToLUN(backing.DeviceName)
+	if err != nil {
+		return fmt.Errorf("failed to resolve RDM device to source LUN: %w", err)
+	}
+
+	c.log.Info("resolving target PV to LUN", "pv", persistentVolume.Name)
+	targetLUN, err := c.ResolvePVToLUN(persistentVolume)
+	if err != nil {
+		return fmt.Errorf("failed to resolve target volume: %w", err)
+	}
+
+	progress <- 10
+
+	// NiMo's trick: set fstype to "raw" so Trident doesn't try to detect/create
+	// a filesystem on the target LUN during import.
+	if err := c.setLunFsTypeToRaw(targetLUN.Name); err != nil {
+		return fmt.Errorf("failed to set LUN fstype to raw: %w", err)
+	}
+
+	c.log.Info("cloning LUN", "source", sourceLUN.Name, "target", targetLUN.Name)
+	if err := c.performBlockVolumeImport(sourceLUN.Name, targetLUN.Name); err != nil {
+		return fmt.Errorf("LUN clone failed: %w", err)
+	}
+
+	progress <- 100
+
+	c.log.Info("RDM copy completed successfully")
+	return nil
+}
+
+func (c *NetappClonner) resolveRDMToLUN(deviceName string) (populator.LUN, error) {
+	c.log.V(2).Info("resolving RDM device to LUN", "device", deviceName)
+
+	serial, err := extractSerialFromNAA(deviceName)
+	if err != nil {
+		c.log.Info("could not extract serial from NAA, trying brute-force search", "device", deviceName, "err", err)
+		return c.findLUNByDeviceName(deviceName)
+	}
+
+	c.log.V(2).Info("finding LUN by serial", "serial", serial)
+	return c.findLUNBySerial(serial)
+}
+
+// extractSerialFromNAA extracts the serial from a NAA/VML device identifier.
+// ONTAP NAA format: naa.600a0980<serial_hex> or vml.0200...<hex_encoded>
+func extractSerialFromNAA(naa string) (string, error) {
+	naa = strings.ToLower(naa)
+
+	// Strip common prefixes
+	naa = strings.TrimPrefix(naa, "vml.")
+	naa = strings.TrimPrefix(naa, "naa.")
+
+	// Remove any leading zeros and length bytes from VML encoding
+	providerIDLower := strings.ToLower(OntapProviderID)
+	idx := strings.Index(naa, providerIDLower)
+	if idx < 0 {
+		return "", fmt.Errorf("NAA %s does not contain ONTAP provider ID %s", naa, OntapProviderID)
+	}
+
+	serial := naa[idx+len(providerIDLower):]
+	if serial == "" {
+		return "", fmt.Errorf("could not extract serial from NAA %s", naa)
+	}
+
+	return serial, nil
+}
+
+func (c *NetappClonner) findLUNBySerial(serial string) (populator.LUN, error) {
+	luns, err := c.api.LunList(context.Background(), "*")
+	if err != nil {
+		return populator.LUN{}, fmt.Errorf("failed to list LUNs: %w", err)
+	}
+
+	serial = strings.ToLower(serial)
+	for _, lun := range luns {
+		if strings.ToLower(lun.SerialNumber) == serial {
+			naa := fmt.Sprintf("naa.%s%s", OntapProviderID, strings.ToLower(lun.SerialNumber))
+			return populator.LUN{
+				Name:         lun.Name,
+				SerialNumber: lun.SerialNumber,
+				NAA:          naa,
+			}, nil
+		}
+	}
+
+	return populator.LUN{}, fmt.Errorf("no LUN found with serial %s", serial)
+}
+
+func (c *NetappClonner) findLUNByDeviceName(deviceName string) (populator.LUN, error) {
+	luns, err := c.api.LunList(context.Background(), "*")
+	if err != nil {
+		return populator.LUN{}, fmt.Errorf("failed to list LUNs: %w", err)
+	}
+
+	deviceName = strings.ToLower(deviceName)
+	for _, lun := range luns {
+		serialLower := strings.ToLower(lun.SerialNumber)
+		if serialLower != "" && strings.Contains(deviceName, serialLower) {
+			naa := fmt.Sprintf("naa.%s%s", OntapProviderID, serialLower)
+			c.log.Info("found matching LUN by device name", "lun", lun.Name, "device", deviceName)
+			return populator.LUN{
+				Name:         lun.Name,
+				SerialNumber: lun.SerialNumber,
+				NAA:          naa,
+			}, nil
+		}
+	}
+
+	return populator.LUN{}, fmt.Errorf("could not find LUN matching RDM device %s", deviceName)
+}
+
+// setLunFsTypeToRaw sets com.netapp.ndvp.fstype to "raw" on the target LUN so
+// Trident treats it as a raw block device and skips filesystem creation.
+func (c *NetappClonner) setLunFsTypeToRaw(lunPath string) error {
+	c.log.Info("setting LUN fstype to raw", "lun", lunPath)
+	return c.api.LunSetAttribute(context.Background(), lunPath, "com.netapp.ndvp.fstype", "raw", "", "")
+}
+
+func (c *NetappClonner) performBlockVolumeImport(sourceLUNPath, targetLUNPath string) error {
+	c.log.Info("performing LUN clone", "source", sourceLUNPath, "target", targetLUNPath)
+
+	sourceLUN, err := c.api.LunGetByName(context.Background(), sourceLUNPath)
+	if err != nil {
+		return fmt.Errorf("failed to get source LUN info: %w", err)
+	}
+
+	// LunCloneCreate args: flexvol (target), source, lunName, qosPolicyGroup
+	// Extract the flexvol from the target path: /vol/<flexvol>/<lun>
+	parts := strings.Split(strings.TrimPrefix(targetLUNPath, "/vol/"), "/")
+	if len(parts) < 2 {
+		return fmt.Errorf("invalid target LUN path format: %s", targetLUNPath)
+	}
+	flexvol := parts[0]
+
+	return c.api.LunCloneCreate(context.Background(), flexvol, sourceLUN.Name, targetLUNPath, api.QosPolicyGroup{})
 }
