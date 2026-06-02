@@ -945,14 +945,14 @@ func (r *Reconciler) validateVM(plan *api.Plan, ctx *plancontext.Context) error 
 		Message:  "Copy offload is enabled. MTV does not support mixed copy methods. Each migration plan can use one migration strategy, either VDDK or copy offload. Check your storage map and VMs to ensure they are using the same migration strategy.",
 		Items:    []string{},
 	}
-	vmCriticalConcerns := libcnd.Condition{
-		Type:     VMCriticalConcerns,
-		Status:   True,
-		Reason:   NotValid,
-		Category: api.CategoryCritical,
-		Message:  "One or more VMs in the plan have critical concerns that block migration.",
-		Items:    []string{},
-	}
+	// vmCriticalConcerns := libcnd.Condition{
+	// 	Type:     VMCriticalConcerns,
+	// 	Status:   True,
+	// 	Reason:   NotValid,
+	// 	Category: api.CategoryCritical,
+	// 	Message:  "One or more VMs in the plan have critical concerns that block migration.",
+	// 	Items:    []string{},
+	// }
 	consolidationNeeded := libcnd.Condition{
 		Type:     VMConsolidationNeeded,
 		Status:   True,
@@ -1066,7 +1066,8 @@ func (r *Reconciler) validateVM(plan *api.Plan, ctx *plancontext.Context) error 
 				setOfTargetName[vm.TargetName] = true
 			}
 		}
-		aggregateCriticalConcerns(v, ref.String(), &vmCriticalConcerns)
+		// TODO: Filter RDM/Independent concerns when CSI import configured - see https://github.com/kubev2v/forklift/pull/6159
+		// aggregateCriticalConcerns(v, ref.String(), &vmCriticalConcerns)
 		aggregateWarningConcerns(v, ref.String(), &unsupportedOVFExportSource)
 		if netAppShift {
 			if vsphereVM, ok := v.(*vsphere.VM); ok {
@@ -1094,6 +1095,8 @@ func (r *Reconciler) validateVM(plan *api.Plan, ctx *plancontext.Context) error 
 
 		// Check for mixed VDDK/Offload usage (vSphere only)
 		// If plan uses offload, add VMs with VDDK disks to the condition
+		// TODO: Also validate VMDK disks on CSI-import-only datastores (no xcopy).
+		// CSI import only supports VVol and RDM — VMDK disks require xcopy.
 		if planUsesOffload {
 			if vsphereVM, ok := v.(*vsphere.VM); ok {
 				storageMap := plan.Referenced.Map.Storage
@@ -1442,9 +1445,9 @@ func (r *Reconciler) validateVM(plan *api.Plan, ctx *plancontext.Context) error 
 	if len(vddkAndOffloadMixedUsage.Items) > 0 {
 		plan.Status.SetCondition(vddkAndOffloadMixedUsage)
 	}
-	if len(vmCriticalConcerns.Items) > 0 {
-		plan.Status.SetCondition(vmCriticalConcerns)
-	}
+	// if len(vmCriticalConcerns.Items) > 0 {
+	// 	plan.Status.SetCondition(vmCriticalConcerns)
+	// }
 	if len(consolidationNeeded.Items) > 0 {
 		plan.Status.SetCondition(consolidationNeeded)
 	}
@@ -2485,16 +2488,24 @@ func (r *Reconciler) validateVirtV2vImage(plan *api.Plan) error {
 	return nil
 }
 
-// vmUsesVddk checks if the VM requires VDDK for migration (i.e., if any disk doesn't use storage offload)
+// vmUsesVddk checks if the VM requires VDDK for migration (i.e., if any disk doesn't use storage offload).
+// Both xcopy and CSI import are considered valid offload methods.
 func (r *Reconciler) vmUsesVddk(storageMap *api.StorageMap, vsphereVM *vsphere.VM, vmName string) (bool, error) {
 	for _, disk := range vsphereVM.Disks {
 		mapping, found := storageMap.FindStorage(disk.Datastore.ID)
 		if !found {
 			continue // Another validation will handle this
 		}
-		if mapping.OffloadPlugin == nil || mapping.OffloadPlugin.VSphereXcopyPluginConfig == nil {
+		if mapping.OffloadPlugin == nil {
 			return true, nil
 		}
+		if mapping.OffloadPlugin.VSphereXcopyPluginConfig != nil {
+			continue
+		}
+		if mapping.OffloadPlugin.CsiImportPluginConfig != nil {
+			continue
+		}
+		return true, nil
 	}
 
 	return false, nil
