@@ -1392,7 +1392,7 @@ func (r *Builder) PopulatorVolumes(vmRef ref.Ref, annotations map[string]string,
 				"diskKey", disk.Key, "deviceName", disk.DeviceName,
 				"vendor", rdmVendor, "storageClass", candidates[0].Destination.StorageClass)
 		default:
-			entry, disambigErr := disambiguateRDMByNAA(r.Source.Inventory, candidates, disk.DeviceName, naaPrefixes)
+			entry, disambigErr := disambiguateRDMByNAA(r.Source.Inventory, candidates, disk.DeviceName)
 			if disambigErr != nil {
 				r.Log.Info("RDM NAA disambiguation failed, falling back to datastore matching",
 					"diskKey", disk.Key, "vendor", rdmVendor, "error", disambigErr)

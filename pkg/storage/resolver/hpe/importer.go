@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/kubev2v/forklift/pkg/storage/resolver"
+	"github.com/kubev2v/forklift/pkg/storage/utils"
 )
 
 // HpeImporter implements CsiImportPlugin for HPE Primera/3PAR/Alletra via WSAPI.
@@ -95,22 +96,14 @@ func (i *HpeImporter) resolveRDM(deviceName string) (map[string]string, error) {
 
 // extractWWN returns the uppercase HPE WWN from either NAA or VML device name format.
 func extractWWN(deviceName string) (string, error) {
-	switch {
-	case strings.HasPrefix(deviceName, "naa."):
-		return strings.ToUpper(strings.TrimPrefix(deviceName, "naa.")), nil
-	case strings.HasPrefix(deviceName, "vml."):
-		hex := strings.TrimPrefix(deviceName, "vml.")
-		if len(hex) < 42 {
-			return "", fmt.Errorf("VML string too short to contain NAA: %s", deviceName)
-		}
-		naa := hex[10:42]
-		if !strings.HasPrefix(naa, "6") {
-			return "", fmt.Errorf("VML does not contain NAA type 6 identifier: %s", deviceName)
-		}
-		return strings.ToUpper(naa), nil
-	default:
-		return strings.ToUpper(deviceName), nil
+	naa, ok := utils.NAAHexFromDeviceName(deviceName)
+	if !ok {
+		naa = strings.ToLower(strings.TrimSpace(deviceName))
 	}
+	if !strings.HasPrefix(naa, "6") {
+		return "", fmt.Errorf("device name does not contain an NAA type 6 identifier: %s", deviceName)
+	}
+	return strings.ToUpper(naa), nil
 }
 
 // volumeNameByFilter queries GET /api/v1/volumes?query=<filter> and returns the first match's name.

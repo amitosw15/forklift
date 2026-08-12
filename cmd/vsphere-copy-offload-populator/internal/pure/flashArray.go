@@ -11,6 +11,7 @@ import (
 	"github.com/kubev2v/forklift/cmd/vsphere-copy-offload-populator/internal/logger"
 	"github.com/kubev2v/forklift/cmd/vsphere-copy-offload-populator/internal/populator"
 	"github.com/kubev2v/forklift/cmd/vsphere-copy-offload-populator/internal/vmware"
+	"github.com/kubev2v/forklift/pkg/storage/utils"
 	"k8s.io/klog/v2"
 )
 
@@ -331,10 +332,11 @@ func (f *FlashArrayClonner) resolveRDMToLUN(deviceName string) (populator.LUN, e
 // extractSerialFromNAA extracts the serial number from a NAA identifier
 // NAA format for Pure: naa.624a9370<serial> where serial is the volume serial
 func extractSerialFromNAA(naa string) (string, error) {
-	naa = strings.ToLower(naa)
-
-	// Remove "naa." prefix if present
-	naa = strings.TrimPrefix(naa, "naa.")
+	if hex, ok := utils.NAAHexFromDeviceName(naa); ok {
+		naa = hex
+	} else {
+		naa = strings.ToLower(strings.TrimSpace(naa))
+	}
 
 	// Check if it starts with Pure's provider ID
 	providerIDLower := strings.ToLower(FlashProviderID)

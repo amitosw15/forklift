@@ -49,6 +49,11 @@ func TestExtractSerialFromNAA(t *testing.T) {
 			expectError:   true,
 			errorContains: "does not appear to be a 3PAR device",
 		},
+		{
+			name:     "vml. device name (MTV-6321)",
+			naa:      "vml.020002000060002ac0000000000000628200021f6b565620202020",
+			expected: "0000000000000628200021F6B",
+		},
 	}
 
 	for _, tc := range tests {
@@ -128,7 +133,8 @@ func TestFindVolumeByVVolID(t *testing.T) {
 
 func TestResolveRDMToLUN(t *testing.T) {
 	volumes := []Volume{
-		{Id: 1, Name: "source-vol-1", WWN: "0000000000000001A00028AF4"},
+		// The real array reports WWN in full (OUI included), not just the serial.
+		{Id: 1, Name: "source-vol-1", WWN: "60002AC0000000000000001A00028AF4"},
 		{Id: 2, Name: "source-vol-2", WWN: "AABBCCDD11223344"},
 	}
 

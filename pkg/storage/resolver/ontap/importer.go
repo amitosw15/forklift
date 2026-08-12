@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/kubev2v/forklift/pkg/storage/resolver"
+	"github.com/kubev2v/forklift/pkg/storage/utils"
 	storagev1 "k8s.io/api/storage/v1"
 	"k8s.io/klog/v2"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -208,26 +209,15 @@ func formatImportName(lunPath, driverType string) (string, error) {
 // The xcopy code encodes serials as fmt.Sprintf("naa.%s%x", "600a0980", serialString),
 // so we reverse: strip prefix, hex-decode the remainder to get the ASCII serial.
 func extractSerialFromNAA(deviceName string) (string, error) {
-	deviceName = strings.ToLower(strings.TrimSpace(deviceName))
-
-	var naaHex string
-	switch {
-	case strings.HasPrefix(deviceName, "vml."):
-		vmlHex := strings.TrimPrefix(deviceName, "vml.")
-		if len(vmlHex) < 42 {
-			return "", fmt.Errorf("VML string too short to contain NAA: %s", deviceName)
-		}
-		naaHex = vmlHex[10:42]
-	case strings.HasPrefix(deviceName, "naa."):
-		naaHex = strings.TrimPrefix(deviceName, "naa.")
-	default:
-		naaHex = deviceName
+	naa, ok := utils.NAAHexFromDeviceName(deviceName)
+	if !ok {
+		naa = strings.ToLower(strings.TrimSpace(deviceName))
 	}
 
-	if !strings.HasPrefix(naaHex, ontapProviderID) {
+	if !strings.HasPrefix(naa, ontapProviderID) {
 		return "", fmt.Errorf("device %s does not have ONTAP OUI prefix %s", deviceName, ontapProviderID)
 	}
-	hexSerial := strings.TrimPrefix(naaHex, ontapProviderID)
+	hexSerial := strings.TrimPrefix(naa, ontapProviderID)
 	if hexSerial == "" {
 		return "", fmt.Errorf("could not extract serial from device %s", deviceName)
 	}

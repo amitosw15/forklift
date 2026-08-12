@@ -11,6 +11,7 @@ import (
 	"github.com/kubev2v/forklift/cmd/vsphere-copy-offload-populator/internal/logger"
 	"github.com/kubev2v/forklift/cmd/vsphere-copy-offload-populator/internal/populator"
 	"github.com/kubev2v/forklift/cmd/vsphere-copy-offload-populator/internal/vmware"
+	"github.com/kubev2v/forklift/pkg/storage/utils"
 )
 
 const maxHostSetNameLen = 27
@@ -259,13 +260,16 @@ func (c *Primera3ParClonner) resolveRDMToLUN(deviceName string) (populator.LUN, 
 		return populator.LUN{}, fmt.Errorf("failed to get volumes: %w", err)
 	}
 
+	// The array reports each volume's WWN in full (OUI included), so strip the
+	// OUI before comparing against the serial extracted above.
+	providerIDLower := strings.ToLower(PROVIDER_ID)
 	c.log.V(2).Info("searching for volume by serial", "serial", serial)
 	for _, v := range volumes {
-		if strings.ToLower(v.WWN) == strings.ToLower(serial) {
+		if strings.EqualFold(strings.TrimPrefix(strings.ToLower(v.WWN), providerIDLower), strings.ToLower(serial)) {
 			lun := populator.LUN{
 				Name:         v.Name,
 				SerialNumber: v.WWN,
-				NAA:          fmt.Sprintf("naa.%s%s", PROVIDER_ID, strings.ToLower(v.WWN)),
+				NAA:          fmt.Sprintf("naa.%s", strings.ToLower(v.WWN)),
 			}
 			c.log.Info("resolved source LUN", "lun", lun.Name, "serial", lun.SerialNumber, "naa", lun.NAA)
 			return lun, nil
@@ -276,8 +280,11 @@ func (c *Primera3ParClonner) resolveRDMToLUN(deviceName string) (populator.LUN, 
 }
 
 func extractSerialFromNAA(naa string) (string, error) {
-	naa = strings.ToLower(naa)
-	naa = strings.TrimPrefix(naa, "naa.")
+	if hex, ok := utils.NAAHexFromDeviceName(naa); ok {
+		naa = hex
+	} else {
+		naa = strings.ToLower(strings.TrimSpace(naa))
+	}
 
 	providerIDLower := strings.ToLower(PROVIDER_ID)
 	if !strings.HasPrefix(naa, providerIDLower) {
@@ -302,7 +309,7 @@ func (c *Primera3ParClonner) findVolumeByDeviceName(deviceName string) (populato
 	c.log.V(2).Info("searching for volume by device name", "device", deviceName)
 
 	for _, volume := range volumes {
-		naa := fmt.Sprintf("naa.%s%s", PROVIDER_ID, strings.ToLower(volume.WWN))
+		naa := fmt.Sprintf("naa.%s", strings.ToLower(volume.WWN))
 
 		if strings.Contains(deviceName, strings.ToLower(volume.WWN)) ||
 			strings.Contains(deviceName, naa) ||
@@ -311,7 +318,7 @@ func (c *Primera3ParClonner) findVolumeByDeviceName(deviceName string) (populato
 			return populator.LUN{
 				Name:         volume.Name,
 				SerialNumber: volume.WWN,
-				NAA:          fmt.Sprintf("naa.%s%s", PROVIDER_ID, strings.ToLower(volume.WWN)),
+				NAA:          naa,
 			}, nil
 		}
 	}

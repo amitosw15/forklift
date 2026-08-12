@@ -168,40 +168,8 @@ var _ = Describe("RDM storage resolution", func() {
 		})
 	})
 
-	Context("extractNAAHex", func() {
-		It("should extract hex from naa. prefix", func() {
-			Expect(extractNAAHex("naa.624a93700123456789abcdef", naaVendorPrefixes)).To(Equal("624a93700123456789abcdef"))
-		})
-
-		It("should extract hex from full device path", func() {
-			Expect(extractNAAHex("/vmfs/devices/disks/naa.624a93700123456789abcdef", naaVendorPrefixes)).To(Equal("624a93700123456789abcdef"))
-		})
-
-		It("should extract NAA-6 hex from vml. prefix, stripping preamble", func() {
-			hex := extractNAAHex("vml.02006a000068ccf0980065753dad7b5819dc1ae4c6506f77657253", naaVendorPrefixes)
-			Expect(hex).To(Equal("68ccf0980065753dad7b5819dc1ae4c6"))
-		})
-
-		It("should return empty for unknown format", func() {
-			Expect(extractNAAHex("eui.0123456789abcdef", naaVendorPrefixes)).To(BeEmpty())
-		})
-
-		It("should return empty for empty string", func() {
-			Expect(extractNAAHex("", naaVendorPrefixes)).To(BeEmpty())
-		})
-
-		It("should lowercase the result", func() {
-			Expect(extractNAAHex("naa.624A93700123456789ABCDEF", naaVendorPrefixes)).To(Equal("624a93700123456789abcdef"))
-		})
-
-		It("should produce comparable output for NAA and VML formats of same LUN", func() {
-			naaHex := extractNAAHex("naa.6000097000022222000000000000001", naaVendorPrefixes)
-			vmlHex := extractNAAHex("vml.02000400006000097000022222000000000000001", naaVendorPrefixes)
-			// Both should produce the same NAA-6 identifier
-			Expect(naaHex).To(Equal("6000097000022222000000000000001"))
-			Expect(vmlHex).To(Equal("6000097000022222000000000000001"))
-		})
-	})
+	// NAA/VML hex extraction itself is tested in pkg/storage/utils (NAAHexFromDeviceName),
+	// which vendorFromNAA/disambiguateRDMByNAA above already exercise end-to-end.
 
 	Context("commonPrefixLen", func() {
 		It("should return 0 for no common prefix", func() {
@@ -258,7 +226,7 @@ var _ = Describe("RDM storage resolution", func() {
 			}
 			// RDM is on array 2 (serial 00002222...)
 			candidates := []*api.StoragePair{&powerMaxEntry1, &powerMaxEntry2}
-			result, err := disambiguateRDMByNAA(inv, candidates, "naa.6000097000022222000000000000099", naaVendorPrefixes)
+			result, err := disambiguateRDMByNAA(inv, candidates, "naa.6000097000022222000000000000099")
 			Expect(err).NotTo(HaveOccurred())
 			Expect(result.Destination.StorageClass).To(Equal("powermax-2-sc"))
 		})
@@ -271,7 +239,7 @@ var _ = Describe("RDM storage resolution", func() {
 				},
 			}
 			candidates := []*api.StoragePair{&powerMaxEntry1, &powerMaxEntry2}
-			result, err := disambiguateRDMByNAA(inv, candidates, "naa.6000097000022222000000000000099", naaVendorPrefixes)
+			result, err := disambiguateRDMByNAA(inv, candidates, "naa.6000097000022222000000000000099")
 			Expect(err).NotTo(HaveOccurred())
 			Expect(result.Destination.StorageClass).To(Equal("powermax-2-sc"))
 		})
@@ -286,7 +254,7 @@ var _ = Describe("RDM storage resolution", func() {
 			}
 			// RDM serial diverges right after OUI — common prefix is only ~7 chars
 			candidates := []*api.StoragePair{&powerMaxEntry1, &powerMaxEntry2}
-			_, err := disambiguateRDMByNAA(inv, candidates, "naa.6000097ccc099999000000000000001", naaVendorPrefixes)
+			_, err := disambiguateRDMByNAA(inv, candidates, "naa.6000097ccc099999000000000000001")
 			Expect(err).To(HaveOccurred())
 			Expect(err.Error()).To(ContainSubstring("none share an array"))
 		})
@@ -294,7 +262,7 @@ var _ = Describe("RDM storage resolution", func() {
 		It("should error when RDM device name has no extractable NAA", func() {
 			inv := &dsInventory{datastores: map[string]model.Datastore{}}
 			candidates := []*api.StoragePair{&powerMaxEntry1}
-			_, err := disambiguateRDMByNAA(inv, candidates, "eui.badformat", naaVendorPrefixes)
+			_, err := disambiguateRDMByNAA(inv, candidates, "eui.badformat")
 			Expect(err).To(HaveOccurred())
 			Expect(err.Error()).To(ContainSubstring("cannot extract NAA hex"))
 		})
@@ -308,7 +276,7 @@ var _ = Describe("RDM storage resolution", func() {
 			}
 			// RDM in VML format, array 2 serial
 			candidates := []*api.StoragePair{&powerMaxEntry1, &powerMaxEntry2}
-			result, err := disambiguateRDMByNAA(inv, candidates, "vml.02000400006000097000022222000000000000099", naaVendorPrefixes)
+			result, err := disambiguateRDMByNAA(inv, candidates, "vml.02000400006000097000022222000000000000099")
 			Expect(err).NotTo(HaveOccurred())
 			Expect(result.Destination.StorageClass).To(Equal("powermax-2-sc"))
 		})
@@ -322,7 +290,7 @@ var _ = Describe("RDM storage resolution", func() {
 			}
 			// RDM in NAA format, array 1 serial
 			candidates := []*api.StoragePair{&powerMaxEntry1, &powerMaxEntry2}
-			result, err := disambiguateRDMByNAA(inv, candidates, "naa.6000097000011111000000000000099", naaVendorPrefixes)
+			result, err := disambiguateRDMByNAA(inv, candidates, "naa.6000097000011111000000000000099")
 			Expect(err).NotTo(HaveOccurred())
 			Expect(result.Destination.StorageClass).To(Equal("powermax-1-sc"))
 		})
@@ -341,7 +309,7 @@ var _ = Describe("RDM storage resolution", func() {
 			}
 			// RDM is on array 1
 			candidates := []*api.StoragePair{&powerMaxEntry1, &powerMaxEntry2}
-			result, err := disambiguateRDMByNAA(inv, candidates, "naa.6000097000011111000000000000099", naaVendorPrefixes)
+			result, err := disambiguateRDMByNAA(inv, candidates, "naa.6000097000011111000000000000099")
 			Expect(err).NotTo(HaveOccurred())
 			Expect(result.Destination.StorageClass).To(Equal("powermax-1-sc"))
 		})

@@ -130,6 +130,12 @@ func TestExtractSerialFromNAA(t *testing.T) {
 			expectError:   true,
 			errorContains: "does not appear to be a Pure FlashArray device",
 		},
+		{
+			name:           "vml. device name",
+			naa:            "vml.0200fd0000624a9370a7b9f7ecc01e40f700014982466c61736841",
+			expectedSerial: "A7B9F7ECC01E40F700014982",
+			expectError:    false,
+		},
 	}
 
 	for _, tc := range testCases {

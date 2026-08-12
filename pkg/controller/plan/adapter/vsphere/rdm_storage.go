@@ -11,7 +11,9 @@ import (
 	"github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1/ref"
 	model "github.com/kubev2v/forklift/pkg/controller/provider/web/vsphere"
 	"github.com/kubev2v/forklift/pkg/settings"
+	"github.com/kubev2v/forklift/pkg/storage/utils"
 	core "k8s.io/api/core/v1"
+	"k8s.io/klog/v2"
 	k8sclient "sigs.k8s.io/controller-runtime/pkg/client"
 )
 
@@ -91,38 +93,15 @@ func loadNAAPrefixes(k8sClient k8sclient.Client) []naaVendorEntry {
 // Returns the matched vendor and true, or empty string and false if no known
 // prefix matches.
 func vendorFromNAA(deviceName string, prefixes []naaVendorEntry) (api.StorageVendorProduct, bool) {
-	lower := strings.ToLower(deviceName)
-
-	// Try naa. format first (e.g. "naa.624a9370..." or "/vmfs/devices/disks/naa.624a9370...")
-	if idx := strings.LastIndex(lower, "naa."); idx >= 0 {
-		naa := lower[idx+4:]
-		for _, entry := range prefixes {
-			if strings.HasPrefix(naa, entry.prefix) {
-				return entry.vendor, true
-			}
-		}
+	naa, ok := utils.NAAHexFromDeviceName(deviceName)
+	if !ok {
 		return "", false
 	}
-
-	// Try vml. format (e.g. "vml.02006a000068ccf098...") — NAA-6 is embedded after
-	// a variable-length preamble. Try each position starting with '6' and check
-	// if it matches a known prefix. The first match wins.
-	if idx := strings.LastIndex(lower, "vml."); idx >= 0 {
-		vml := lower[idx+4:]
-		for i := 0; i < len(vml); i++ {
-			if vml[i] != '6' {
-				continue
-			}
-			candidate := vml[i:]
-			for _, entry := range prefixes {
-				if strings.HasPrefix(candidate, entry.prefix) {
-					return entry.vendor, true
-				}
-			}
+	for _, entry := range prefixes {
+		if strings.HasPrefix(naa, entry.prefix) {
+			return entry.vendor, true
 		}
-		return "", false
 	}
-
 	return "", false
 }
 
@@ -155,10 +134,9 @@ func disambiguateRDMByNAA(
 	inventory datastoreFinder,
 	candidates []*api.StoragePair,
 	rdmDeviceName string,
-	prefixes []naaVendorEntry,
 ) (*api.StoragePair, error) {
-	rdmNAA := extractNAAHex(rdmDeviceName, prefixes)
-	if rdmNAA == "" {
+	rdmNAA, ok := utils.NAAHexFromDeviceName(rdmDeviceName)
+	if !ok {
 		return nil, fmt.Errorf("cannot extract NAA hex from RDM device %q", rdmDeviceName)
 	}
 
@@ -171,7 +149,11 @@ func disambiguateRDMByNAA(
 			continue
 		}
 		for _, backingNAA := range ds.BackingDevicesNames {
-			backingHex := extractNAAHex(backingNAA, prefixes)
+			backingHex, ok := utils.NAAHexFromDeviceName(backingNAA)
+			if !ok {
+				klog.V(2).Infof("could not extract NAA hex from backing device %q, skipping", backingNAA)
+				continue
+			}
 			prefixLen := commonPrefixLen(rdmNAA, backingHex)
 			if prefixLen > bestPrefixLen {
 				bestPrefixLen = prefixLen
@@ -189,46 +171,6 @@ func disambiguateRDMByNAA(
 				"(best NAA prefix match: %d hex chars)", len(candidates), rdmDeviceName, bestPrefixLen)
 	}
 	return bestEntry, nil
-}
-
-// extractNAAHex returns the hex digits of the NAA-6 identifier from a device
-// name. Handles "naa." format (strips prefix), "vml." format (scans for a
-// known NAA vendor prefix embedded after the VML preamble), and full device
-// paths. Returns lowercase, or empty if no NAA can be extracted.
-// NAA-6 identifiers are 32 hex characters (16 bytes); the result is truncated
-// to this length to exclude trailing vendor-specific VML suffixes.
-func extractNAAHex(deviceName string, prefixes []naaVendorEntry) string {
-	lower := strings.ToLower(deviceName)
-	const naa6Len = 32 // NAA-6 = 16 bytes = 32 hex chars
-	// Prefer naa. format — most straightforward.
-	if idx := strings.LastIndex(lower, "naa."); idx >= 0 {
-		hex := lower[idx+4:]
-		if len(hex) > naa6Len {
-			hex = hex[:naa6Len]
-		}
-		return hex
-	}
-	// VML format: the NAA-6 bytes are embedded after a variable-length preamble.
-	// Scan for a known vendor prefix to locate the NAA start reliably.
-	if idx := strings.LastIndex(lower, "vml."); idx >= 0 {
-		vml := lower[idx+4:]
-		for i := 0; i < len(vml); i++ {
-			if vml[i] != '6' {
-				continue
-			}
-			candidate := vml[i:]
-			for _, entry := range prefixes {
-				if strings.HasPrefix(candidate, entry.prefix) {
-					if len(candidate) > naa6Len {
-						candidate = candidate[:naa6Len]
-					}
-					return candidate
-				}
-			}
-		}
-		return "" // no known prefix found in VML hex
-	}
-	return ""
 }
 
 // commonPrefixLen returns the length of the common prefix of two strings.
